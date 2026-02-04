@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { 
-  Mail, 
-  Phone, 
+import {
+  Mail,
+  Phone,
   MapPin,
   Send,
   Calendar,
@@ -28,10 +28,10 @@ const contactSchema = z.object({
 });
 
 const executives = [
-  { name: 'John Mwangi', role: 'Chairperson', phone: '+254 712 345 678', email: 'chair@theteam.co.ke' },
-  { name: 'Mary Wanjiku', role: 'Vice Chairperson', phone: '+254 713 456 789', email: 'vice@theteam.co.ke' },
-  { name: 'Peter Ochieng', role: 'Secretary', phone: '+254 714 567 890', email: 'secretary@theteam.co.ke' },
-  { name: 'Grace Mutua', role: 'Treasurer', phone: '+254 715 678 901', email: 'treasurer@theteam.co.ke' },
+  { name: 'Mark Masila', role: 'Chairperson', phone: '+254 790723609', email: 'masilakisangau@gmail.com' },
+  { name: 'Michael Kamote', role: 'Secretary', phone: '+254 794366274', email: 'michaelkamote2019@gmail.com' },
+  { name: 'Munyoki Mutua', role: 'Vice Secretary', phone: '+254 769083128', email: 'munyokimutua513@gmail.com' },
+  { name: 'Mutemwa Willy', role: 'Treasurer', phone: '+254 718510747', email: 'mutemwawillie@gmail.com' },
 ];
 
 const meetingSchedule = [
@@ -93,11 +93,11 @@ export default function Contact() {
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
-      
+
       {/* Hero Section */}
       <section className="hero-gradient pt-32 pb-16 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
-        
+
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 text-sm text-white/90 mb-6">
@@ -229,7 +229,7 @@ export default function Contact() {
                   </div>
                   <div>
                     <p className="font-medium text-foreground">Email</p>
-                    <p className="text-sm text-muted-foreground">info@theteam.co.ke</p>
+                    <p className="text-sm text-muted-foreground">masilakisangau@gmail.com</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
@@ -238,7 +238,7 @@ export default function Contact() {
                   </div>
                   <div>
                     <p className="font-medium text-foreground">Phone</p>
-                    <p className="text-sm text-muted-foreground">+254 700 000 000</p>
+                    <p className="text-sm text-muted-foreground">+254 790723609</p>
                   </div>
                 </div>
                 <div className="flex items-start gap-3">
