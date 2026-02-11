@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, Users, LogOut, Bell, LayoutDashboard } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth';
+import { supabase } from '@/integrations/supabase/client';
 
 const navLinks = [
   { href: '/', label: 'Home' },
@@ -15,14 +16,31 @@ const memberLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/members', label: 'Members', icon: Users },
   { href: '/payments', label: 'Payments' },
+  { href: '/records', label: 'Records' },
   { href: '/notifications', label: 'Notifications', icon: Bell },
+  { href: '/admin/payments', label: 'Admin', adminOnly: true },
 ];
 
 export function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .eq('role', 'admin')
+        .maybeSingle()
+        .then(({ data }) => setIsAdmin(!!data));
+    } else {
+      setIsAdmin(false);
+    }
+  }, [user]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -61,7 +79,9 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-            {user && memberLinks.map((link) => (
+            {user && memberLinks
+              .filter(link => !('adminOnly' in link) || isAdmin)
+              .map((link) => (
               <Link
                 key={link.href}
                 to={link.href}
@@ -131,7 +151,7 @@ export function Navbar() {
             {user && (
               <>
                 <div className="border-t my-2 pt-2" />
-                {memberLinks.map((link) => (
+                {memberLinks.filter(link => !('adminOnly' in link) || isAdmin).map((link) => (
                   <Link
                     key={link.href}
                     to={link.href}
