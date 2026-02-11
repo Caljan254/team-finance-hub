@@ -14,178 +14,214 @@ import {
   Wallet,
   Calendar,
   AlertTriangle,
-  FileText
+  FileText,
+  Shield,
+  Briefcase,
+  Gavel
 } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 const constitutionSections = [
   {
-    id: 'article-1',
-    title: 'Article 1: Name and Purpose',
+    id: 'motto',
+    title: 'Motto',
+    icon: Shield,
+    content: `<p class="text-lg font-semibold italic">"Diverse but United"</p>`,
+  },
+  {
+    id: 'objectives',
+    title: 'Objectives',
     icon: BookOpen,
     content: `
-      <h4>1.1 Name</h4>
-      <p>The organization shall be known as "THE TEAM: Diverse but United" (hereinafter referred to as "THE TEAM" or "the Group").</p>
-      
-      <h4>1.2 Purpose</h4>
-      <p>THE TEAM is established as a financial collective with the following objectives:</p>
       <ul>
-        <li>To promote a culture of savings among members</li>
-        <li>To provide financial support to members through loans and emergency funds</li>
-        <li>To invest collectively in ventures that benefit all members</li>
-        <li>To foster unity and mutual support among members</li>
+        <li>Fight poverty by initiating Income Generating Activities (I.G.As)</li>
+        <li>Solicit funds from government and NGOs</li>
+        <li>Create job opportunities through the I.G.As</li>
+        <li>Source funds and knowledge to establish and expand both individual and association enterprises</li>
       </ul>
     `,
   },
   {
-    id: 'article-2',
-    title: 'Article 2: Membership',
+    id: 'membership',
+    title: 'Membership',
     icon: Users,
     content: `
-      <h4>2.1 Eligibility</h4>
-      <p>Membership is open to any individual who:</p>
-      <ul>
-        <li>Is at least 18 years of age</li>
-        <li>Agrees to abide by this constitution</li>
-        <li>Is willing and able to make regular monthly contributions</li>
-        <li>Is recommended by at least one existing member</li>
-      </ul>
+      <h4>Registration</h4>
+      <p>New members shall register at a fee of <strong>KSh 200</strong>.</p>
       
-      <h4>2.2 Rights of Members</h4>
-      <p>All members shall have the right to:</p>
+      <h4>Ceasing to be a Member</h4>
+      <p>Any member shall cease being a member of this group through:</p>
       <ul>
-        <li>Attend and vote at all general meetings</li>
-        <li>Access loans and emergency funds as per the guidelines</li>
-        <li>Receive regular financial reports and updates</li>
-        <li>Participate in investment decisions</li>
-      </ul>
-      
-      <h4>2.3 Obligations of Members</h4>
-      <p>All members are required to:</p>
-      <ul>
-        <li>Pay monthly contributions on time</li>
-        <li>Attend meetings regularly</li>
-        <li>Repay any loans as per the agreed schedule</li>
-        <li>Maintain the confidentiality of group matters</li>
+        <li>Death</li>
+        <li>Expulsion</li>
+        <li>Resignation</li>
       </ul>
     `,
   },
   {
-    id: 'article-3',
-    title: 'Article 3: Contributions',
-    icon: Wallet,
+    id: 'election',
+    title: 'Election',
+    icon: Gavel,
     content: `
-      <h4>3.1 Monthly Contributions</h4>
-      <p>Each member shall contribute <strong>KSh 600</strong> per month.</p>
-      
-      <h4>3.2 Payment Deadline</h4>
-      <p>All contributions must be paid by the <strong>10th day</strong> of each month.</p>
-      
-      <h4>3.3 Payment Method</h4>
-      <p>Contributions shall be made via M-Pesa to the designated group account.</p>
-      
-      <h4>3.4 Record Keeping</h4>
-      <p>The Treasurer shall maintain accurate records of all contributions and provide monthly statements to all members.</p>
-    `,
-  },
-  {
-    id: 'article-4',
-    title: 'Article 4: Penalties',
-    icon: AlertTriangle,
-    content: `
-      <h4>4.1 Late Payment Penalty</h4>
-      <p>Members who fail to pay their contributions by the deadline shall be charged a penalty of <strong>KSh 10 per day</strong> until payment is made.</p>
-      
-      <h4>4.2 Penalty Calculation</h4>
-      <p>Penalties shall be calculated automatically from the 11th day of the month until the full contribution is received.</p>
-      
-      <h4>4.3 Penalty Collection</h4>
-      <p>Penalties shall be collected together with the contribution and shall form part of the group's funds.</p>
-      
-      <h4>4.4 Exemptions</h4>
-      <p>The Executive Committee may, at its discretion, waive penalties in cases of genuine hardship, provided the member notifies the group before the deadline.</p>
-    `,
-  },
-  {
-    id: 'article-5',
-    title: 'Article 5: Meetings',
-    icon: Calendar,
-    content: `
-      <h4>5.1 Regular Meetings</h4>
-      <p>The Group shall hold regular meetings at least once per month.</p>
-      
-      <h4>5.2 Annual General Meeting</h4>
-      <p>An Annual General Meeting (AGM) shall be held once a year to:</p>
       <ul>
-        <li>Review the group's financial performance</li>
-        <li>Elect new officials</li>
-        <li>Plan for the coming year</li>
-        <li>Amend the constitution if necessary</li>
+        <li>Election of officials shall be done after one year</li>
+        <li>Elected officials shall serve for one year</li>
+        <li>Offices falling vacant before the end of the tenure shall be filled through a by-election</li>
       </ul>
-      
-      <h4>5.3 Quorum</h4>
-      <p>A quorum of two-thirds of all members must be present for any meeting to proceed.</p>
-      
-      <h4>5.4 Decision Making</h4>
-      <p>Decisions shall be made by simple majority vote, except for constitutional amendments which require a two-thirds majority.</p>
     `,
   },
   {
-    id: 'article-6',
-    title: 'Article 6: Governance',
+    id: 'executive',
+    title: 'The Executive & Duties',
+    icon: Briefcase,
+    content: `
+      <h4>The Executive</h4>
+      <p>The executive is comprised of:</p>
+      <ul>
+        <li>Chairperson</li>
+        <li>Vice Chairperson</li>
+        <li>Treasurer</li>
+        <li>Secretary</li>
+        <li>Vice Secretary</li>
+        <li>Organizing Secretary</li>
+      </ul>
+
+      <h4>Chairperson</h4>
+      <ul>
+        <li>Chair all group meetings</li>
+        <li>Be the spokesperson of the group</li>
+        <li>Be a signatory to the group's bank account</li>
+        <li>Enforce group policies and objectives</li>
+        <li>Authorize expenditure of group resources</li>
+      </ul>
+
+      <h4>Secretary</h4>
+      <ul>
+        <li>Write and minute all group proceedings</li>
+        <li>Handle group correspondence</li>
+        <li>May be a signatory to the group's bank account (optional)</li>
+      </ul>
+
+      <h4>Treasurer</h4>
+      <ul>
+        <li>Manage all group money and resources</li>
+        <li>Keep financial records</li>
+        <li>Present financial reports</li>
+        <li>Be a signatory to the group's bank account</li>
+      </ul>
+
+      <h4>Vice Secretary</h4>
+      <ul>
+        <li>Assume the secretary's role in their absence (except bank signatory duties)</li>
+      </ul>
+
+      <h4>Organizing Secretary</h4>
+      <ul>
+        <li>Arrange all meetings in liaison with the chairperson</li>
+        <li>Ensure all group sections run smoothly</li>
+        <li>Disseminate information to members on time</li>
+        <li>Serve as the master of ceremony in group functions</li>
+        <li>Organize venues and seating for meetings</li>
+        <li>Maintain order during meetings, including managing disorderly members</li>
+      </ul>
+    `,
+  },
+  {
+    id: 'discipline',
+    title: 'Discipline',
     icon: Scale,
     content: `
-      <h4>6.1 Executive Committee</h4>
-      <p>The Group shall be governed by an Executive Committee consisting of:</p>
       <ul>
-        <li><strong>Chairperson</strong> - Presides over meetings and represents the group</li>
-        <li><strong>Vice Chairperson</strong> - Assists the Chair and acts in their absence</li>
-        <li><strong>Secretary</strong> - Keeps minutes and maintains correspondence</li>
-        <li><strong>Treasurer</strong> - Manages all financial matters</li>
-        <li><strong>Organizing Secretary</strong> - Coordinates group activities and events</li>
+        <li>Punctuality</li>
+        <li>Availability</li>
+        <li>Sobriety</li>
       </ul>
-      
-      <h4>6.2 Term of Office</h4>
-      <p>Officials shall serve for a term of one year and may be re-elected.</p>
-      
-      <h4>6.3 Removal from Office</h4>
-      <p>An official may be removed by a two-thirds majority vote at a special meeting called for that purpose.</p>
     `,
   },
   {
-    id: 'article-7',
-    title: 'Article 7: Loans and Welfare',
+    id: 'meetings',
+    title: 'Meetings',
+    icon: Calendar,
+    content: `
+      <ul>
+        <li>Group meetings will be held on the <strong>11th of every month</strong></li>
+        <li>Failure to attend a scheduled meeting without valid reason will attract a fine of <strong>KSh 50</strong>, which will be deducted from the member's shares. If this continues, further fines will accumulate daily.</li>
+      </ul>
+    `,
+  },
+  {
+    id: 'money',
+    title: 'Money and Resources',
     icon: Wallet,
     content: `
-      <h4>7.1 Loan Eligibility</h4>
-      <p>Members may apply for loans after completing at least three months of consistent contributions.</p>
-      
-      <h4>7.2 Loan Limits</h4>
-      <p>Members may borrow up to three times their total contributions.</p>
-      
-      <h4>7.3 Interest Rate</h4>
-      <p>Loans shall attract an interest rate of 10% per annum, calculated on a reducing balance.</p>
-      
-      <h4>7.4 Repayment Period</h4>
-      <p>All loans must be repaid within 12 months.</p>
-      
-      <h4>7.5 Welfare Fund</h4>
-      <p>10% of monthly collections shall be set aside for emergency welfare support to members.</p>
+      <p>The group shall generate income through:</p>
+      <ul>
+        <li>KSh 200 registration fee</li>
+        <li>KSh 500 (minimum) monthly savings</li>
+        <li>Grants/Loans from government and NGOs</li>
+        <li>Fundraising and donations from well-wishers</li>
+        <li>Profit from the group's I.G.As</li>
+      </ul>
+
+      <h4>Deadlines</h4>
+      <ul>
+        <li>The savings deadline is the <strong>10th of every month</strong></li>
+        <li>Late submission will attract a penalty of <strong>KSh 10 per day</strong> until paid</li>
+      </ul>
     `,
   },
   {
-    id: 'article-8',
-    title: 'Article 8: Amendments',
+    id: 'refunds',
+    title: 'Refunds',
     icon: FileText,
     content: `
-      <h4>8.1 Amendment Process</h4>
-      <p>This constitution may be amended only at an Annual General Meeting or a Special General Meeting called for that purpose.</p>
-      
-      <h4>8.2 Voting Requirement</h4>
-      <p>Any amendment requires approval by at least two-thirds of all members present and voting.</p>
-      
-      <h4>8.3 Notice</h4>
-      <p>Members must be given at least 14 days' notice of any proposed amendments.</p>
+      <p>Refunds shall be processed as follows:</p>
+      <ul>
+        <li>In case of death, the immediate family or next of kin will receive <strong>100%</strong> of the member's savings</li>
+        <li>In case of expulsion or resignation, the member will be refunded <strong>70%</strong> of their savings</li>
+        <li>Registration fee is <strong>non-refundable</strong></li>
+        <li>On <strong>December 2030</strong>, members shall be allowed to withdraw fully from the group and shall receive 100% of their contributions, less transaction costs, along with their share of profit earned by that time</li>
+        <li>Thereafter, withdrawal from the group shall be allowed only after every <strong>10 years</strong></li>
+        <li>Any withdrawal before the 10-year period will attract the 70% refund rule as stated above</li>
+      </ul>
+    `,
+  },
+  {
+    id: 'records',
+    title: 'Books of Record and Reports',
+    icon: FileText,
+    content: `
+      <p>The group will maintain a register, minutes book, and other records as needed. All records shall be accessible to members upon reasonable notice. An annual report will be prepared and presented at the AGM held in December each year.</p>
+    `,
+  },
+  {
+    id: 'loans',
+    title: 'Loan Payment Policy',
+    icon: Wallet,
+    content: `
+      <ul>
+        <li>If your loan deadline falls on the 25th or later, it will be extended to the 8th of the following month</li>
+        <li>Loan duration is <strong>3 months</strong>; failure to repay within 3 months attracts additional interest based on the total loan + first 3 months interest</li>
+        <li>This interest must be paid within <strong>14 days</strong>; failure to pay the interest within that time will result in expulsion and 70% refund of contribution</li>
+      </ul>
+
+      <h4>Sharing of Loan Interest</h4>
+      <ul>
+        <li>Members will receive <strong>70%</strong> of interest paid on their own loans</li>
+        <li>The remaining <strong>30%</strong> will be shared equally among all members</li>
+      </ul>
+    `,
+  },
+  {
+    id: 'penalties',
+    title: 'Penalties',
+    icon: AlertTriangle,
+    content: `
+      <ul>
+        <li>Late payment penalty: <strong>KSh 10 per day</strong> after the 10th of each month</li>
+        <li>Meeting absence fine: <strong>KSh 50</strong> per missed meeting without valid reason</li>
+        <li>Continued absence attracts daily accumulating fines</li>
+      </ul>
     `,
   },
 ];
@@ -207,28 +243,21 @@ export default function Constitution() {
     <div className="min-h-screen bg-background">
       <Navbar />
       
-      {/* Hero Section */}
       <section className="hero-gradient pt-32 pb-16 relative overflow-hidden">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PGNpcmNsZSBjeD0iMzAiIGN5PSIzMCIgcj0iMiIvPjwvZz48L2c+PC9zdmc+')] opacity-50" />
-        
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl mx-auto text-center">
             <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 text-sm text-white/90 mb-6">
               <Scale className="w-4 h-4" />
               Official Document
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Constitution
-            </h1>
-            <p className="text-lg text-white/80">
-              The governing document of THE TEAM: Diverse but United
-            </p>
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">Constitution</h1>
+            <p className="text-lg text-white/80">The governing document of THE TEAM: Diverse but United</p>
           </div>
         </div>
       </section>
 
       <main className="container mx-auto px-4 py-12">
-        {/* Search and Actions */}
         <div className="flex flex-col sm:flex-row gap-4 mb-8 max-w-4xl mx-auto">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
@@ -251,19 +280,14 @@ export default function Constitution() {
           </div>
         </div>
 
-        {/* Constitution Content */}
         <div className="max-w-4xl mx-auto">
           <Card className="mb-8">
             <CardHeader className="text-center border-b">
               <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-4">
                 <Scale className="w-8 h-8 text-primary" />
               </div>
-              <CardTitle className="text-2xl">
-                THE TEAM: Diverse but United
-              </CardTitle>
-              <p className="text-muted-foreground">
-                Constitution and Bylaws • Effective January 2025
-              </p>
+              <CardTitle className="text-2xl">THE TEAM: Diverse but United</CardTitle>
+              <p className="text-muted-foreground">Constitution and Bylaws • Effective January 2025</p>
             </CardHeader>
             <CardContent className="p-0">
               <Accordion 

@@ -43,7 +43,7 @@ serve(async (req) => {
       );
 
       // Find pending payment with matching checkout request ID and update it
-      const { error } = await supabase
+      const { data: updatedPayments, error } = await supabase
         .from('payments')
         .update({
           status: 'paid',
@@ -51,10 +51,36 @@ serve(async (req) => {
           transaction_id: mpesaReceiptNumber,
         })
         .eq('transaction_id', checkoutRequestID)
-        .eq('status', 'pending');
+        .eq('status', 'pending')
+        .select('user_id, month, year, amount');
 
       if (error) {
         console.error('DB update error:', error);
+      }
+
+      // Auto-insert into contribution_records
+      if (updatedPayments && updatedPayments.length > 0) {
+        const payment = updatedPayments[0];
+        // Get member name from profile
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('user_id', payment.user_id)
+          .single();
+
+        if (profile) {
+          await supabase.from('contribution_records').upsert({
+            member_name: profile.full_name,
+            user_id: payment.user_id,
+            month: payment.month,
+            year: payment.year,
+            amount: payment.amount,
+            status: 'paid',
+            paid_date: new Date().toISOString(),
+            transaction_id: mpesaReceiptNumber,
+          }, { onConflict: 'member_name,month,year' });
+          console.log(`Auto-recorded contribution for ${profile.full_name}`);
+        }
       }
     } else {
       console.log(`Payment failed: ResultCode=${resultCode}, Desc=${callback.ResultDesc}`);
