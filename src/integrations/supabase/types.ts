@@ -14,6 +14,51 @@ export type Database = {
   }
   public: {
     Tables: {
+      contribution_records: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          marked_by: string | null
+          member_name: string
+          month: string
+          paid_date: string | null
+          status: string
+          transaction_id: string | null
+          updated_at: string | null
+          user_id: string | null
+          year: number
+        }
+        Insert: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          marked_by?: string | null
+          member_name: string
+          month: string
+          paid_date?: string | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          year: number
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          marked_by?: string | null
+          member_name?: string
+          month?: string
+          paid_date?: string | null
+          status?: string
+          transaction_id?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          year?: number
+        }
+        Relationships: []
+      }
       meetings: {
         Row: {
           agenda: string[] | null
