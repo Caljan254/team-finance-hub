@@ -55,11 +55,11 @@ export function Footer() {
             <ul className="space-y-3">
               <li className="flex items-center gap-3 text-sidebar-foreground/70">
                 <Mail className="w-4 h-4 text-primary" />
-                <span className="text-sm">info@theteam.co.ke</span>
+                <span className="text-sm">masilakisangau@gmail.com</span>
               </li>
               <li className="flex items-center gap-3 text-sidebar-foreground/70">
                 <Phone className="w-4 h-4 text-primary" />
-                <span className="text-sm">+254 700 000 000</span>
+                <span className="text-sm">+254 790723609</span>
               </li>
               <li className="flex items-start gap-3 text-sidebar-foreground/70">
                 <MapPin className="w-4 h-4 text-primary mt-0.5" />
