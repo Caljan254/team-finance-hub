@@ -8,6 +8,7 @@ import { CountdownTimer } from '@/components/CountdownTimer';
 import { MpesaPaymentModal } from '@/components/MpesaPaymentModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { calculateOutstanding, type PaymentBreakdown } from '@/lib/penalty-utils';
 import { 
   CreditCard, 
   TrendingUp, 
@@ -41,6 +42,12 @@ export default function Dashboard() {
     totalPenalties: 0,
     currentMonthStatus: 'pending',
     recentPayments: [],
+  });
+  const [breakdown, setBreakdown] = useState<PaymentBreakdown>({
+    unpaidMonths: [],
+    totalContribution: 0,
+    totalPenalties: 0,
+    grandTotal: 0,
   });
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [profile, setProfile] = useState<{ full_name: string } | null>(null);
@@ -94,9 +101,14 @@ export default function Dashboard() {
       const currentYear = new Date().getFullYear();
       const currentPayment = payments.find(p => p.month === currentMonth && p.year === currentYear);
       
+      const outstanding = calculateOutstanding(
+        payments.map(p => ({ month: p.month, year: p.year, status: p.status }))
+      );
+      setBreakdown(outstanding);
+      
       setPaymentSummary({
         totalPaid,
-        totalPenalties,
+        totalPenalties: outstanding.totalPenalties,
         currentMonthStatus: (currentPayment?.status as 'paid' | 'pending' | 'overdue') || 'pending',
         recentPayments: payments as any,
       });
@@ -107,23 +119,8 @@ export default function Dashboard() {
     return new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
   };
 
-  const handlePaymentSuccess = async (transactionId: string) => {
-    if (!user) return;
-
-    const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
-    const currentYear = new Date().getFullYear();
-
-    await supabase.from('payments').insert({
-      user_id: user.id,
-      amount: 600,
-      month: currentMonth,
-      year: currentYear,
-      status: 'paid',
-      paid_date: new Date().toISOString(),
-      transaction_id: transactionId,
-      total_amount: 600,
-    });
-
+  const handlePaymentSuccess = async (_transactionId: string) => {
+    // Payment is saved by MpesaPaymentModal, just refresh
     fetchPaymentData();
   };
 
@@ -232,30 +229,40 @@ export default function Dashboard() {
 
             {/* Quick Pay Card */}
             <Card className="overflow-hidden">
-              <div className="bg-gradient-to-r from-primary to-accent p-6 text-primary-foreground">
+              <div className={`p-6 text-primary-foreground ${breakdown.grandTotal > 0 ? 'bg-gradient-to-r from-destructive/90 to-destructive/70' : 'bg-gradient-to-r from-primary to-accent'}`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">Quick Payment</h3>
+                    <h3 className="text-xl font-semibold">
+                      {breakdown.grandTotal > 0 ? 'Outstanding Balance' : 'All Caught Up!'}
+                    </h3>
                     <p className="text-primary-foreground/80">
-                      {getCurrentMonth()} Contribution
+                      {breakdown.unpaidMonths.length > 0 
+                        ? `${breakdown.unpaidMonths.length} unpaid month${breakdown.unpaidMonths.length > 1 ? 's' : ''}`
+                        : 'No pending payments'
+                      }
                     </p>
                   </div>
                   <CreditCard className="w-12 h-12 opacity-50" />
                 </div>
                 <div className="mt-4 flex items-center justify-between">
                   <div>
-                    <p className="text-3xl font-bold">KSh 600</p>
-                    <p className="text-sm text-primary-foreground/80">Monthly contribution</p>
+                    <p className="text-3xl font-bold">KSh {breakdown.grandTotal.toLocaleString()}</p>
+                    {breakdown.totalPenalties > 0 && (
+                      <p className="text-sm text-primary-foreground/80">
+                        Includes KSh {breakdown.totalPenalties.toLocaleString()} in penalties
+                      </p>
+                    )}
                   </div>
-                  <Button 
-                    variant="secondary" 
-                    size="lg"
-                    onClick={() => setIsPaymentModalOpen(true)}
-                    disabled={paymentSummary.currentMonthStatus === 'paid'}
-                  >
-                    {paymentSummary.currentMonthStatus === 'paid' ? 'Paid' : 'Pay Now'}
-                    {paymentSummary.currentMonthStatus !== 'paid' && <ArrowUpRight className="w-4 h-4 ml-2" />}
-                  </Button>
+                  {breakdown.grandTotal > 0 && (
+                    <Button 
+                      variant="secondary" 
+                      size="lg"
+                      onClick={() => setIsPaymentModalOpen(true)}
+                    >
+                      Pay Now
+                      <ArrowUpRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </Card>
@@ -354,8 +361,8 @@ export default function Dashboard() {
       <MpesaPaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
-        amount={600}
-        month={getCurrentMonth()}
+        amount={breakdown.grandTotal}
+        month={breakdown.unpaidMonths.map(u => u.month).join(', ')}
         onSuccess={handlePaymentSuccess}
       />
     </div>
