@@ -58,7 +58,7 @@ export default function Auth() {
         .maybeSingle()
         .then(({ data }) => {
           if (data?.role === 'admin') {
-            navigate('/admin/payments');
+            navigate('/admin');
           } else {
             navigate('/dashboard');
           }
@@ -102,7 +102,7 @@ export default function Auth() {
         if (userRole?.role === 'admin') {
           console.log('👑 Admin user logged in!');
           toast({ title: 'Welcome back, Admin!', description: 'Redirecting to admin dashboard.' });
-          navigate('/admin/payments');
+          navigate('/admin');
         } else {
           console.log('👤 Member user logged in!');
           toast({ title: 'Welcome back!', description: 'You have successfully signed in.' });

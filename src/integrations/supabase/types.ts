@@ -59,6 +59,92 @@ export type Database = {
         }
         Relationships: []
       }
+      loan_repayments: {
+        Row: {
+          amount: number
+          created_at: string | null
+          id: string
+          loan_id: string
+          marked_by: string | null
+          paid_date: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          id?: string
+          loan_id: string
+          marked_by?: string | null
+          paid_date?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          id?: string
+          loan_id?: string
+          marked_by?: string | null
+          paid_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "loan_repayments_loan_id_fkey"
+            columns: ["loan_id"]
+            isOneToOne: false
+            referencedRelation: "loans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      loans: {
+        Row: {
+          amount: number
+          borrower_name: string
+          created_at: string | null
+          due_date: string
+          extended_due_date: string | null
+          id: string
+          interest_rate: number
+          issued_date: string
+          repaid_date: string | null
+          status: string
+          total_interest: number
+          total_repaid: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          borrower_name: string
+          created_at?: string | null
+          due_date: string
+          extended_due_date?: string | null
+          id?: string
+          interest_rate?: number
+          issued_date?: string
+          repaid_date?: string | null
+          status?: string
+          total_interest?: number
+          total_repaid?: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          borrower_name?: string
+          created_at?: string | null
+          due_date?: string
+          extended_due_date?: string | null
+          id?: string
+          interest_rate?: number
+          issued_date?: string
+          repaid_date?: string | null
+          status?: string
+          total_interest?: number
+          total_repaid?: number
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       meetings: {
         Row: {
           agenda: string[] | null
