@@ -8,6 +8,7 @@ import { CountdownTimer } from '@/components/CountdownTimer';
 import { MpesaPaymentModal } from '@/components/MpesaPaymentModal';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { calculateOutstanding, type PaymentBreakdown } from '@/lib/penalty-utils';
 import { 
   CreditCard, 
   Download,
@@ -37,7 +38,12 @@ export default function Payments() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [loadingPayments, setLoadingPayments] = useState(true);
-  const [currentMonthPaid, setCurrentMonthPaid] = useState(false);
+  const [breakdown, setBreakdown] = useState<PaymentBreakdown>({
+    unpaidMonths: [],
+    totalContribution: 0,
+    totalPenalties: 0,
+    grandTotal: 0,
+  });
 
   useEffect(() => {
     if (!loading && !user) {
@@ -64,38 +70,17 @@ export default function Payments() {
 
     if (data) {
       setPayments(data as Payment[]);
-      
-      // Check if current month is paid
-      const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
-      const currentYear = new Date().getFullYear();
-      const currentPayment = data.find(p => p.month === currentMonth && p.year === currentYear);
-      setCurrentMonthPaid(currentPayment?.status === 'paid');
+      const outstanding = calculateOutstanding(
+        data.map(p => ({ month: p.month, year: p.year, status: p.status }))
+      );
+      setBreakdown(outstanding);
     }
     
     setLoadingPayments(false);
   };
 
-  const getCurrentMonth = () => {
-    return new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
-  };
-
-  const handlePaymentSuccess = async (transactionId: string) => {
-    if (!user) return;
-
-    const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
-    const currentYear = new Date().getFullYear();
-
-    await supabase.from('payments').insert({
-      user_id: user.id,
-      amount: 600,
-      month: currentMonth,
-      year: currentYear,
-      status: 'paid',
-      paid_date: new Date().toISOString(),
-      transaction_id: transactionId,
-      total_amount: 600,
-    });
-
+  const handlePaymentSuccess = async (_transactionId: string) => {
+    // Payment is already saved by MpesaPaymentModal, just refresh
     fetchPayments();
   };
 
@@ -125,7 +110,6 @@ export default function Payments() {
     }
   };
 
-  // Generate months for the year
   const months = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December'
@@ -133,6 +117,8 @@ export default function Payments() {
 
   const currentYear = new Date().getFullYear();
   const currentMonthIndex = new Date().getMonth();
+
+  const hasOutstanding = breakdown.grandTotal > 0;
 
   if (loading || loadingPayments) {
     return (
@@ -163,44 +149,94 @@ export default function Payments() {
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Left Column - Payment Actions */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Quick Pay Card */}
+            {/* Outstanding Balance Card */}
             <Card className="overflow-hidden">
-              <div className="bg-gradient-to-r from-primary to-accent p-6 text-primary-foreground">
+              <div className={`p-6 ${hasOutstanding ? 'bg-gradient-to-r from-destructive/90 to-destructive/70' : 'bg-gradient-to-r from-primary to-accent'} text-primary-foreground`}>
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="text-xl font-semibold">Make Payment</h3>
+                    <h3 className="text-xl font-semibold">
+                      {hasOutstanding ? 'Outstanding Balance' : 'All Caught Up!'}
+                    </h3>
                     <p className="text-primary-foreground/80">
-                      {getCurrentMonth()} Contribution
+                      {hasOutstanding 
+                        ? `${breakdown.unpaidMonths.length} unpaid month${breakdown.unpaidMonths.length > 1 ? 's' : ''}`
+                        : 'No pending payments'
+                      }
                     </p>
                   </div>
                   <CreditCard className="w-12 h-12 opacity-50" />
                 </div>
                 <div className="mt-4 flex items-center justify-between">
                   <div>
-                    <p className="text-3xl font-bold">KSh 600</p>
-                    <p className="text-sm text-primary-foreground/80">Monthly contribution</p>
-                  </div>
-                  <Button 
-                    variant="secondary" 
-                    size="lg"
-                    onClick={() => setIsPaymentModalOpen(true)}
-                    disabled={currentMonthPaid}
-                  >
-                    {currentMonthPaid ? (
-                      <>
-                        <CheckCircle className="w-4 h-4 mr-2" />
-                        Paid
-                      </>
-                    ) : (
-                      <>
-                        Pay Now
-                        <ArrowUpRight className="w-4 h-4 ml-2" />
-                      </>
+                    <p className="text-3xl font-bold">
+                      KSh {breakdown.grandTotal.toLocaleString()}
+                    </p>
+                    {breakdown.totalPenalties > 0 && (
+                      <p className="text-sm text-primary-foreground/80">
+                        Includes KSh {breakdown.totalPenalties.toLocaleString()} in penalties
+                      </p>
                     )}
-                  </Button>
+                  </div>
+                  {hasOutstanding && (
+                    <Button 
+                      variant="secondary" 
+                      size="lg"
+                      onClick={() => setIsPaymentModalOpen(true)}
+                    >
+                      Pay Now
+                      <ArrowUpRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  )}
                 </div>
               </div>
             </Card>
+
+            {/* Unpaid Months Breakdown */}
+            {breakdown.unpaidMonths.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-destructive">
+                    <AlertTriangle className="w-5 h-5" />
+                    Unpaid Penalties Breakdown
+                  </CardTitle>
+                  <CardDescription>KSh 10/day penalty after the 10th of each month</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {breakdown.unpaidMonths.map((item) => (
+                      <div
+                        key={`${item.month}-${item.year}`}
+                        className="flex items-center justify-between p-4 rounded-xl bg-destructive/5 border border-destructive/10"
+                      >
+                        <div>
+                          <p className="font-medium">{item.month} {item.year}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {item.penaltyDays > 0 
+                              ? `${item.penaltyDays} day${item.penaltyDays > 1 ? 's' : ''} overdue`
+                              : 'Due by the 10th'
+                            }
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-semibold">KSh {item.totalDue.toLocaleString()}</p>
+                          <div className="text-xs text-muted-foreground">
+                            <span>600 contribution</span>
+                            {item.penaltyAmount > 0 && (
+                              <span className="text-destructive"> + {item.penaltyAmount.toLocaleString()} penalty</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {/* Total row */}
+                    <div className="flex items-center justify-between p-4 rounded-xl bg-destructive/10 border border-destructive/20 font-semibold">
+                      <p>Total Due</p>
+                      <p className="text-lg">KSh {breakdown.grandTotal.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Payment Calendar */}
             <Card>
@@ -214,35 +250,46 @@ export default function Payments() {
               <CardContent>
                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2">
                   {months.map((month, index) => {
-                    const payment = payments.find(p => p.month === month && p.year === currentYear);
+                    const payment = payments.find(p => p.month === month && p.year === currentYear && p.status === 'paid');
+                    const unpaid = breakdown.unpaidMonths.find(u => u.month === month && u.year === currentYear);
                     const isPast = index < currentMonthIndex;
                     const isCurrent = index === currentMonthIndex;
+                    const isFuture = index > currentMonthIndex;
                     
                     return (
                       <div
                         key={month}
                         className={`p-3 rounded-xl text-center transition-all ${
-                          payment?.status === 'paid'
+                          payment
                             ? 'bg-success/10 border-2 border-success/30'
+                            : unpaid && unpaid.penaltyAmount > 0
+                            ? 'bg-destructive/10 border-2 border-destructive/30'
                             : isCurrent
                             ? 'bg-primary/10 border-2 border-primary/30'
-                            : isPast
-                            ? 'bg-destructive/10 border-2 border-destructive/30'
-                            : 'bg-muted border-2 border-transparent'
+                            : isFuture
+                            ? 'bg-muted border-2 border-transparent'
+                            : 'bg-destructive/10 border-2 border-destructive/30'
                         }`}
                       >
                         <p className="text-xs font-medium text-muted-foreground">
                           {month.slice(0, 3)}
                         </p>
                         <div className="mt-1">
-                          {payment?.status === 'paid' ? (
+                          {payment ? (
                             <CheckCircle className="w-5 h-5 mx-auto text-success" />
+                          ) : unpaid && unpaid.penaltyAmount > 0 ? (
+                            <div>
+                              <AlertTriangle className="w-5 h-5 mx-auto text-destructive" />
+                              <p className="text-[10px] text-destructive font-medium mt-0.5">
+                                +{unpaid.penaltyAmount}
+                              </p>
+                            </div>
                           ) : isCurrent ? (
                             <Clock className="w-5 h-5 mx-auto text-primary" />
-                          ) : isPast ? (
-                            <AlertTriangle className="w-5 h-5 mx-auto text-destructive" />
-                          ) : (
+                          ) : isFuture ? (
                             <div className="w-5 h-5 mx-auto rounded-full border-2 border-muted-foreground/30" />
+                          ) : (
+                            <AlertTriangle className="w-5 h-5 mx-auto text-destructive" />
                           )}
                         </div>
                       </div>
@@ -363,8 +410,8 @@ export default function Payments() {
       <MpesaPaymentModal
         isOpen={isPaymentModalOpen}
         onClose={() => setIsPaymentModalOpen(false)}
-        amount={600}
-        month={getCurrentMonth()}
+        amount={breakdown.grandTotal}
+        month={breakdown.unpaidMonths.map(u => u.month).join(', ')}
         onSuccess={handlePaymentSuccess}
       />
     </div>
