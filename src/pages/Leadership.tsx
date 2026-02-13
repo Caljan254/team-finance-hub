@@ -5,32 +5,25 @@ import { Crown, Users, Shield, BookOpen, Briefcase } from 'lucide-react';
 
 const leaders = [
   {
-    name: 'Caleb Mumo',
+    name: 'Mark Masila',
     role: 'Chairperson',
     description: 'Chairs all group meetings, spokesperson of the group, enforces group policies and objectives.',
-    image: '/uploads/caleb-mumo.jpg',
+    image: '/uploads/mark-masila.jpg',
     icon: Crown,
   },
   {
-    name: 'Joel Mwetu',
-    role: 'Secretary',
-    description: 'Writes and minutes all group proceedings, handles group correspondence.',
-    image: '/uploads/joel-mwetu.jpg',
-    icon: BookOpen,
-  },
-  {
-    name: 'Mark Masila',
+    name: 'Mutemwa Willy',
     role: 'Treasurer',
     description: 'Manages all group money and resources, keeps financial records, presents financial reports.',
-    image: '/uploads/mark-masila.jpg',
+    image: '/uploads/mutemwa-willy.jpg',
     icon: Shield,
   },
   {
     name: 'Michael Kamote',
-    role: 'Vice Chairperson',
-    description: 'Assumes the chairperson\'s duties in their absence.',
+    role: 'Secretary',
+    description: 'Writes and minutes all group proceedings, handles group correspondence.',
     image: '/uploads/michael-kamote.jpg',
-    icon: Users,
+    icon: BookOpen,
   },
   {
     name: 'Munyoki Mutua',
@@ -40,10 +33,10 @@ const leaders = [
     icon: BookOpen,
   },
   {
-    name: 'Mutemwa Willy',
-    role: 'Organizing Secretary',
-    description: 'Arranges all meetings, ensures smooth group operations, disseminates information to members.',
-    image: '/uploads/mutemwa-willy.jpg',
+    name: 'Caleb Mumo',
+    role: 'ICT Director / CEO',
+    description: 'Oversees all technology initiatives, manages digital platforms, and drives innovation for the group.',
+    image: '/uploads/caleb-mumo.jpg',
     icon: Briefcase,
   },
 ];

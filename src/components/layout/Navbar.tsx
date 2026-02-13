@@ -5,22 +5,30 @@ import { Button } from '@/components/ui/button';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 
-const navLinks = [
+const publicLinks = [
   { href: '/', label: 'Home' },
-  { href: '/about', label: 'About' },
-  { href: '/leadership', label: 'Leadership' },
-  { href: '/constitution', label: 'Constitution' },
-  { href: '/contact', label: 'Contact' },
 ];
 
 const memberLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+];
+
+const midLinks = [
+  { href: '/about', label: 'About' },
+  { href: '/leadership', label: 'Leadership' },
+  { href: '/constitution', label: 'Constitution' },
+];
+
+const memberMidLinks = [
   { href: '/members', label: 'Members', icon: Users },
   { href: '/payments', label: 'Payments' },
   { href: '/loans', label: 'Loans' },
   { href: '/records', label: 'Records' },
   { href: '/notifications', label: 'Notifications', icon: Bell },
-  { href: '/admin', label: 'Admin', adminOnly: true },
+];
+
+const endLinks = [
+  { href: '/contact', label: 'Contact' },
 ];
 
 export function Navbar() {
@@ -66,36 +74,25 @@ export function Navbar() {
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center gap-1">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                to={link.href}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActive(link.href)
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-              >
-                {link.label}
-              </Link>
+            {publicLinks.map((link) => (
+              <Link key={link.href} to={link.href} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive(link.href) ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>{link.label}</Link>
             ))}
-            {user && memberLinks
-              .filter(link => !('adminOnly' in link) || isAdmin)
-              .map((link) => (
-              <Link
-                key={link.href}
-                to={link.href}
-                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActive(link.href)
-                    ? 'bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                }`}
-              >
-                {link.label}
-              </Link>
+            {user && memberLinks.map((link) => (
+              <Link key={link.href} to={link.href} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive(link.href) ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>{link.label}</Link>
             ))}
+            {midLinks.map((link) => (
+              <Link key={link.href} to={link.href} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive(link.href) ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>{link.label}</Link>
+            ))}
+            {user && memberMidLinks.map((link) => (
+              <Link key={link.href} to={link.href} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive(link.href) ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>{link.label}</Link>
+            ))}
+            {endLinks.map((link) => (
+              <Link key={link.href} to={link.href} className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive(link.href) ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>{link.label}</Link>
+            ))}
+            {user && isAdmin && (
+              <Link to="/admin" className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isActive('/admin') ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:text-foreground hover:bg-muted'}`}>Admin</Link>
+            )}
           </div>
 
           {/* Auth Buttons */}
@@ -136,7 +133,7 @@ export function Navbar() {
       {isOpen && (
         <div className="lg:hidden glass border-t animate-fade-in">
           <div className="container mx-auto px-4 py-4 space-y-2">
-            {navLinks.map((link) => (
+            {[...publicLinks, ...(user ? memberLinks : []), ...midLinks, ...(user ? memberMidLinks : []), ...endLinks].map((link) => (
               <Link
                 key={link.href}
                 to={link.href}
@@ -150,24 +147,18 @@ export function Navbar() {
                 {link.label}
               </Link>
             ))}
-            {user && (
-              <>
-                <div className="border-t my-2 pt-2" />
-                {memberLinks.filter(link => !('adminOnly' in link) || isAdmin).map((link) => (
-                  <Link
-                    key={link.href}
-                    to={link.href}
-                    onClick={() => setIsOpen(false)}
-                    className={`block px-4 py-3 rounded-lg font-medium transition-colors ${
-                      isActive(link.href)
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
-                    }`}
-                  >
-                    {link.label}
-                  </Link>
-                ))}
-              </>
+            {user && isAdmin && (
+              <Link
+                to="/admin"
+                onClick={() => setIsOpen(false)}
+                className={`block px-4 py-3 rounded-lg font-medium transition-colors ${
+                  isActive('/admin')
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                }`}
+              >
+                Admin
+              </Link>
             )}
             <div className="border-t my-2 pt-2" />
             {user ? (
