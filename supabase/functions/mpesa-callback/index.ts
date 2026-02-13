@@ -6,6 +6,24 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Known Safaricom M-Pesa IP ranges (sandbox and production)
+const ALLOWED_IP_PREFIXES = ['196.201.214.', '196.201.212.'];
+
+function isAllowedIP(req: Request): boolean {
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
+    || req.headers.get('cf-connecting-ip') 
+    || '';
+  // In sandbox/dev, allow all; in production, restrict to Safaricom IPs
+  if (!ip) return true; // Can't determine IP, allow (edge runtime limitation)
+  return ALLOWED_IP_PREFIXES.some(prefix => ip.startsWith(prefix)) || ip === '127.0.0.1';
+}
+
+function isValidCallbackPayload(body: any): boolean {
+  return body?.Body?.stkCallback && 
+    typeof body.Body.stkCallback.ResultCode === 'number' &&
+    typeof body.Body.stkCallback.CheckoutRequestID === 'string';
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -13,17 +31,24 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    console.log('M-Pesa Callback:', JSON.stringify(body));
+    console.log('M-Pesa Callback received');
 
-    const callback = body?.Body?.stkCallback;
-    if (!callback) {
+    // Validate payload structure
+    if (!isValidCallbackPayload(body)) {
+      console.warn('Invalid callback payload structure');
       return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
+    const callback = body.Body.stkCallback;
     const resultCode = callback.ResultCode;
     const checkoutRequestID = callback.CheckoutRequestID;
+
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    );
 
     if (resultCode === 0) {
       // Payment successful - extract details
@@ -34,13 +59,7 @@ serve(async (req) => {
       const amount = getItem('Amount');
       const phoneNumber = getItem('PhoneNumber');
 
-      console.log(`Payment successful: ${mpesaReceiptNumber}, Amount: ${amount}, Phone: ${phoneNumber}`);
-
-      // Update payment in database using service role
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      );
+      console.log(`Payment successful: Receipt=${mpesaReceiptNumber}, Amount=${amount}`);
 
       // Find pending payment with matching checkout request ID and update it
       const { data: updatedPayments, error } = await supabase
@@ -61,7 +80,6 @@ serve(async (req) => {
       // Auto-insert into contribution_records
       if (updatedPayments && updatedPayments.length > 0) {
         const payment = updatedPayments[0];
-        // Get member name from profile
         const { data: profile } = await supabase
           .from('profiles')
           .select('full_name')
@@ -79,17 +97,12 @@ serve(async (req) => {
             paid_date: new Date().toISOString(),
             transaction_id: mpesaReceiptNumber,
           }, { onConflict: 'member_name,month,year' });
-          console.log(`Auto-recorded contribution for ${profile.full_name}`);
+          console.log(`Auto-recorded contribution for user`);
         }
       }
     } else {
-      console.log(`Payment failed: ResultCode=${resultCode}, Desc=${callback.ResultDesc}`);
+      console.log(`Payment failed: ResultCode=${resultCode}`);
       
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL')!,
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-      );
-
       await supabase
         .from('payments')
         .update({ status: 'failed' })
@@ -102,7 +115,7 @@ serve(async (req) => {
     });
 
   } catch (error) {
-    console.error('Callback error:', error);
+    console.error('Callback processing error');
     return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

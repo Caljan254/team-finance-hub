@@ -82,16 +82,8 @@ export default function AdminDashboard() {
 
   const checkAdmin = async () => {
     if (!user) return;
-    const { data } = await supabase
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', user.id)
-      .eq('role', 'admin')
-      .maybeSingle();
-    
-    if (data) {
-      setIsAdmin(true);
-    }
+    const { data } = await supabase.rpc('has_role', { _user_id: user.id, _role: 'admin' });
+    setIsAdmin(!!data);
     setLoading(false);
   };
 
@@ -134,7 +126,7 @@ export default function AdminDashboard() {
         paid_date: new Date().toISOString(),
         marked_by: user.id,
       });
-      if (error) toast.error('Failed to save: ' + error.message);
+      if (error) { console.error('Save error:', error); toast.error('Failed to save payment record'); }
       else toast.success(`Marked ${memberName} as paid for ${selectedMonth}`);
     }
 
