@@ -93,7 +93,7 @@ export default function Leadership() {
               <Shield className="w-10 h-10 text-primary mx-auto mb-3" />
               <h3 className="font-semibold text-lg mb-2">As per our Constitution</h3>
               <p className="text-sm text-muted-foreground">
-                Election of officials shall be done after one year. Elected officials shall serve for one year. 
+                Election of officials shall be done after one year. Elected officials shall serve for one year.
                 Offices falling vacant before the end of tenure shall be filled through a by-election.
               </p>
             </CardContent>

@@ -12,7 +12,7 @@ export function Footer() {
               <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
                 <Users className="w-5 h-5 text-primary-foreground" />
               </div>
-              <div>
+              <div className="flex flex-col">
                 <span className="font-bold text-lg">THE TEAM</span>
                 <p className="text-sm text-sidebar-foreground/70">Diverse but United</p>
               </div>
