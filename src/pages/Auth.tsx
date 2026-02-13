@@ -51,7 +51,18 @@ export default function Auth() {
 
   useEffect(() => {
     if (user) {
-      navigate('/dashboard');
+      supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.role === 'admin') {
+            navigate('/admin/payments');
+          } else {
+            navigate('/dashboard');
+          }
+        });
     }
   }, [user, navigate]);
 
@@ -79,8 +90,27 @@ export default function Auth() {
         setError(error.message);
       }
     } else {
-      toast({ title: 'Welcome back!', description: 'You have successfully signed in.' });
-      navigate('/dashboard');
+      // Check user role and redirect accordingly
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (currentUser) {
+        const { data: userRole } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', currentUser.id)
+          .maybeSingle();
+
+        if (userRole?.role === 'admin') {
+          console.log('👑 Admin user logged in!');
+          toast({ title: 'Welcome back, Admin!', description: 'Redirecting to admin dashboard.' });
+          navigate('/admin/payments');
+        } else {
+          console.log('👤 Member user logged in!');
+          toast({ title: 'Welcome back!', description: 'You have successfully signed in.' });
+          navigate('/dashboard');
+        }
+      } else {
+        navigate('/dashboard');
+      }
     }
   };
 
