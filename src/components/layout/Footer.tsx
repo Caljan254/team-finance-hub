@@ -94,8 +94,43 @@ export function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-sidebar-border mt-8 pt-8 text-center text-sidebar-foreground/60 text-sm">
-          <p>&copy; {new Date().getFullYear()} THE TEAM: Diverse but United. All rights reserved.</p>
+        {/* Bottom Bar with Copyright, Developer Credit, and Legal Links */}
+        <div className="border-t border-sidebar-border mt-8 pt-8">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            {/* Copyright - Left */}
+            <div className="text-sidebar-foreground/60 text-sm">
+              <p>&copy; {new Date().getFullYear()} THE TEAM: Diverse but United. All rights reserved.</p>
+            </div>
+
+            {/* Developer Credit - Center on mobile, left on desktop */}
+            <div className="text-sidebar-foreground/60 text-sm">
+              Developed by{' '}
+              <a
+                href="https://caljan254.github.io/portfolio"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary/80 transition-colors font-medium"
+              >
+                SkySoft solution LTD
+              </a>
+            </div>
+
+            {/* Privacy & Terms - Right */}
+            <div className="flex gap-4 text-sm">
+              <Link
+                to="/privacy"
+                className="text-sidebar-foreground/60 hover:text-primary transition-colors"
+              >
+                Privacy Policy
+              </Link>
+              <Link
+                to="/terms"
+                className="text-sidebar-foreground/60 hover:text-primary transition-colors"
+              >
+                Terms of Service
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </footer>
