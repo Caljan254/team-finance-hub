@@ -83,43 +83,43 @@
      }
    };
  
-   const fetchMembers = async () => {
-     setLoadingMembers(true);
-     try {
-       const { data: profiles, error } = await supabase
-         .from('profiles')
-         .select('*')
-         .eq('is_active', true)
-         .order('full_name');
- 
-       if (error) throw error;
- 
-       if (profiles) {
-         const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
-         const currentYear = new Date().getFullYear();
- 
-         const membersWithStatus = await Promise.all(
-           profiles.map(async (profile) => {
-             const { data: payment } = await supabase
-               .from('payments')
-               .select('status')
-               .eq('user_id', profile.user_id)
-               .eq('month', currentMonth)
-               .eq('year', currentYear)
-               .single();
- 
-             const { data: isUserAdmin } = await supabase.rpc('has_role', {
-               _user_id: profile.user_id,
-               _role: 'admin'
-             });
- 
-             return {
-               ...profile,
-               payment_status: (payment?.status as 'paid' | 'pending' | 'overdue') || 'pending',
-               is_admin: isUserAdmin || false,
-             };
-           })
-         );
+  const fetchMembers = async () => {
+    setLoadingMembers(true);
+    try {
+      // Use member_directory view for limited public info (name, image, join_date)
+      const { data: profiles, error } = await supabase
+        .from('member_directory' as any)
+        .select('*')
+        .order('full_name') as { data: any[] | null; error: any };
+
+      if (error) throw error;
+
+      if (profiles) {
+        const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
+        const currentYear = new Date().getFullYear();
+
+        const membersWithStatus = await Promise.all(
+          profiles.map(async (profile: any) => {
+            const { data: payment } = await supabase
+              .from('payments')
+              .select('status')
+              .eq('user_id', profile.user_id)
+              .eq('month', currentMonth)
+              .eq('year', currentYear)
+              .single();
+
+            const { data: isUserAdmin } = await supabase.rpc('has_role', {
+              _user_id: profile.user_id,
+              _role: 'admin'
+            });
+
+            return {
+              ...profile,
+              payment_status: (payment?.status as 'paid' | 'pending' | 'overdue') || 'pending',
+              is_admin: isUserAdmin || false,
+            };
+          })
+        );
  
          setMembers(membersWithStatus);
          const admins = membersWithStatus.filter(m => m.is_admin);

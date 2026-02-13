@@ -360,7 +360,33 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      member_directory: {
+        Row: {
+          full_name: string | null
+          id: string | null
+          is_active: boolean | null
+          join_date: string | null
+          profile_image: string | null
+          user_id: string | null
+        }
+        Insert: {
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          join_date?: string | null
+          profile_image?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          full_name?: string | null
+          id?: string | null
+          is_active?: boolean | null
+          join_date?: string | null
+          profile_image?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {
