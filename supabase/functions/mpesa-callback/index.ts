@@ -6,20 +6,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Known Safaricom M-Pesa IP ranges (sandbox and production)
+// Known Safaricom M-Pesa IP ranges
 const ALLOWED_IP_PREFIXES = ['196.201.214.', '196.201.212.'];
 
 function isAllowedIP(req: Request): boolean {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() 
-    || req.headers.get('cf-connecting-ip') 
+  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+    || req.headers.get('cf-connecting-ip')
     || '';
-  // In sandbox/dev, allow all; in production, restrict to Safaricom IPs
-  if (!ip) return true; // Can't determine IP, allow (edge runtime limitation)
+  if (!ip) return true; // Edge runtime may not expose IP
   return ALLOWED_IP_PREFIXES.some(prefix => ip.startsWith(prefix)) || ip === '127.0.0.1';
 }
 
 function isValidCallbackPayload(body: any): boolean {
-  return body?.Body?.stkCallback && 
+  return body?.Body?.stkCallback &&
     typeof body.Body.stkCallback.ResultCode === 'number' &&
     typeof body.Body.stkCallback.CheckoutRequestID === 'string';
 }
@@ -30,13 +29,23 @@ serve(async (req) => {
   }
 
   try {
+    // Enforce IP validation
+    if (!isAllowedIP(req)) {
+      console.warn('Rejected callback from unauthorized IP');
+      return new Response(JSON.stringify({ error: 'Forbidden' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const body = await req.json();
     console.log('M-Pesa Callback received');
 
-    // Validate payload structure
+    // Reject invalid payloads
     if (!isValidCallbackPayload(body)) {
       console.warn('Invalid callback payload structure');
-      return new Response(JSON.stringify({ ResultCode: 0, ResultDesc: 'Accepted' }), {
+      return new Response(JSON.stringify({ error: 'Invalid payload' }), {
+        status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -51,17 +60,14 @@ serve(async (req) => {
     );
 
     if (resultCode === 0) {
-      // Payment successful - extract details
       const items = callback.CallbackMetadata?.Item || [];
       const getItem = (name: string) => items.find((i: any) => i.Name === name)?.Value;
 
       const mpesaReceiptNumber = getItem('MpesaReceiptNumber');
       const amount = getItem('Amount');
-      const phoneNumber = getItem('PhoneNumber');
 
       console.log(`Payment successful: Receipt=${mpesaReceiptNumber}, Amount=${amount}`);
 
-      // Find pending payment with matching checkout request ID and update it
       const { data: updatedPayments, error } = await supabase
         .from('payments')
         .update({
@@ -77,7 +83,6 @@ serve(async (req) => {
         console.error('DB update error:', error);
       }
 
-      // Auto-insert into contribution_records
       if (updatedPayments && updatedPayments.length > 0) {
         const payment = updatedPayments[0];
         const { data: profile } = await supabase
@@ -97,12 +102,11 @@ serve(async (req) => {
             paid_date: new Date().toISOString(),
             transaction_id: mpesaReceiptNumber,
           }, { onConflict: 'member_name,month,year' });
-          console.log(`Auto-recorded contribution for user`);
         }
       }
     } else {
       console.log(`Payment failed: ResultCode=${resultCode}`);
-      
+
       await supabase
         .from('payments')
         .update({ status: 'failed' })
