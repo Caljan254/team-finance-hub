@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 const navLinks = [
   { href: '/', label: 'Home' },
   { href: '/about', label: 'About' },
+  { href: '/leadership', label: 'Leadership' },
   { href: '/constitution', label: 'Constitution' },
   { href: '/contact', label: 'Contact' },
 ];
@@ -16,9 +17,10 @@ const memberLinks = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/members', label: 'Members', icon: Users },
   { href: '/payments', label: 'Payments' },
+  { href: '/loans', label: 'Loans' },
   { href: '/records', label: 'Records' },
   { href: '/notifications', label: 'Notifications', icon: Bell },
-  { href: '/admin/payments', label: 'Admin', adminOnly: true },
+  { href: '/admin', label: 'Admin', adminOnly: true },
 ];
 
 export function Navbar() {
