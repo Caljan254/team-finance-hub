@@ -2,18 +2,23 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const resendApiKey = Deno.env.get('RESEND_API_KEY');
     const supabase = createClient(supabaseUrl, supabaseKey);
+
+    if (!resendApiKey) {
+      return new Response(JSON.stringify({ error: 'RESEND_API_KEY not configured' }), { status: 500, headers: corsHeaders });
+    }
 
     // Verify admin
     const authHeader = req.headers.get('Authorization');
@@ -52,12 +57,11 @@ Deno.serve(async (req) => {
       user_id: null,
     });
 
-    // Send emails using Supabase's built-in email (via auth admin)
-    const emailResults: string[] = [];
-    
+    // Send emails via Resend
+    const emailResults: { email: string; success: boolean; error?: string }[] = [];
+
     for (const profile of profiles) {
       if (profile.email) {
-        // Use the Lovable AI gateway to format a nice email body
         const htmlBody = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="background: linear-gradient(135deg, #1a365d, #2d5a8e); padding: 20px; border-radius: 12px 12px 0 0;">
@@ -80,18 +84,40 @@ Deno.serve(async (req) => {
           </div>
         `;
 
-        // Send via Supabase auth admin invite (workaround for sending emails)
-        // Actually, let's use a direct SMTP or Resend approach
-        // For now, we'll track which emails should be sent
-        emailResults.push(profile.email);
+        try {
+          const res = await fetch('https://api.resend.com/emails', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${resendApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              from: 'THE TEAM <onboarding@resend.dev>',
+              to: [profile.email],
+              subject: title,
+              html: htmlBody,
+            }),
+          });
+
+          if (res.ok) {
+            emailResults.push({ email: profile.email, success: true });
+          } else {
+            const errData = await res.text();
+            emailResults.push({ email: profile.email, success: false, error: errData });
+          }
+        } catch (emailErr) {
+          emailResults.push({ email: profile.email, success: false, error: String(emailErr) });
+        }
       }
     }
 
+    const successCount = emailResults.filter(r => r.success).length;
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: `Notification saved and broadcast to ${profiles.length} members`,
-        emails: emailResults,
+      JSON.stringify({
+        success: true,
+        message: `Notification saved. ${successCount}/${emailResults.length} emails sent successfully.`,
+        emailResults,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
