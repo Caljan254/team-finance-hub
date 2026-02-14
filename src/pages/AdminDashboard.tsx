@@ -12,9 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Shield, Users, Bell, CreditCard, CheckCircle, XCircle, Plus, 
-  Loader2, UserCheck, UserX, Send, Crown, AlertTriangle
+  Loader2, UserCheck, UserX, Send, AlertTriangle, Trash2, Eye
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { calculateOutstanding } from '@/lib/penalty-utils';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -40,6 +41,15 @@ interface ContributionRecord {
   status: string;
 }
 
+interface MemberFinancialSummary {
+  memberName: string;
+  totalPaid: number;
+  totalOwed: number;
+  totalPenalties: number;
+  paidMonths: number;
+  unpaidMonths: number;
+}
+
 export default function AdminDashboard() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -58,12 +68,17 @@ export default function AdminDashboard() {
   // Members state
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [loadingProfiles, setLoadingProfiles] = useState(false);
+  const [deletingMember, setDeletingMember] = useState<string | null>(null);
 
   // Notifications state
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMessage, setNotifMessage] = useState('');
   const [notifType, setNotifType] = useState('general');
   const [sendingNotif, setSendingNotif] = useState(false);
+
+  // Member financial overview
+  const [memberSummaries, setMemberSummaries] = useState<MemberFinancialSummary[]>([]);
+  const [loadingSummaries, setLoadingSummaries] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
@@ -77,6 +92,7 @@ export default function AdminDashboard() {
     if (isAdmin) {
       if (activeTab === 'payments') fetchPaymentData();
       if (activeTab === 'members') fetchProfiles();
+      if (activeTab === 'overview') fetchMemberOverview();
     }
   }, [isAdmin, activeTab, selectedYear, selectedMonth]);
 
@@ -183,6 +199,71 @@ export default function AdminDashboard() {
     }
   };
 
+  const deleteMember = async (profile: Profile) => {
+    if (!confirm(`Are you sure you want to PERMANENTLY delete ${profile.full_name}? This will remove their profile, roles, payments, and all associated data. This action cannot be undone!`)) {
+      return;
+    }
+    setDeletingMember(profile.id);
+    
+    // Delete related data first
+    await supabase.from('notifications').delete().eq('user_id', profile.user_id);
+    await supabase.from('payments').delete().eq('user_id', profile.user_id);
+    await supabase.from('penalties').delete().eq('user_id', profile.user_id);
+    await supabase.from('user_roles').delete().eq('user_id', profile.user_id);
+    
+    // Delete contribution records by name
+    await supabase.from('contribution_records').delete().eq('member_name', profile.full_name);
+    
+    // Delete profile
+    const { error } = await supabase.from('profiles').delete().eq('id', profile.id);
+    
+    if (error) {
+      toast.error('Failed to delete member: ' + error.message);
+    } else {
+      toast.success(`${profile.full_name} has been permanently deleted`);
+      fetchProfiles();
+    }
+    setDeletingMember(null);
+  };
+
+  // --- MEMBER FINANCIAL OVERVIEW ---
+  const fetchMemberOverview = async () => {
+    setLoadingSummaries(true);
+    
+    // Get all contribution records
+    const { data: allRecs } = await supabase
+      .from('contribution_records')
+      .select('*')
+      .order('member_name');
+    
+    if (allRecs) {
+      const memberNames = [...new Set(allRecs.map(r => r.member_name))].sort();
+      
+      const summaries: MemberFinancialSummary[] = memberNames.map(name => {
+        const memberRecs = allRecs.filter(r => r.member_name === name);
+        const paidRecs = memberRecs.filter(r => r.status === 'paid');
+        const totalPaid = paidRecs.reduce((sum, r) => sum + Number(r.amount), 0);
+        
+        // Calculate outstanding using penalty-utils
+        const breakdown = calculateOutstanding(
+          paidRecs.map(r => ({ month: r.month, year: r.year, status: r.status }))
+        );
+        
+        return {
+          memberName: name,
+          totalPaid,
+          totalOwed: breakdown.grandTotal,
+          totalPenalties: breakdown.totalPenalties,
+          paidMonths: paidRecs.length,
+          unpaidMonths: breakdown.unpaidMonths.length,
+        };
+      });
+      
+      setMemberSummaries(summaries);
+    }
+    setLoadingSummaries(false);
+  };
+
   // --- NOTIFICATIONS ---
   const sendNotification = async () => {
     if (!notifTitle.trim() || !notifMessage.trim()) {
@@ -191,18 +272,46 @@ export default function AdminDashboard() {
     }
     setSendingNotif(true);
 
-    // Insert notification for all members (user_id = null means broadcast)
-    const { error } = await supabase.from('notifications').insert({
-      title: notifTitle.trim(),
-      message: notifMessage.trim(),
-      type: notifType,
-      user_id: null,
-    });
+    try {
+      // Call edge function to send notifications + emails
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
 
-    if (error) {
-      toast.error('Failed to send notification: ' + error.message);
-    } else {
-      toast.success('Notification sent to all members!');
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-notification`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            title: notifTitle.trim(),
+            message: notifMessage.trim(),
+            type: notifType,
+          }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        toast.success(`Notification sent to ${result.emails?.length || 0} members!`);
+        setNotifTitle('');
+        setNotifMessage('');
+        setNotifType('general');
+      } else {
+        toast.error('Failed to send: ' + (result.error || 'Unknown error'));
+      }
+    } catch (err) {
+      // Fallback: just save to DB
+      await supabase.from('notifications').insert({
+        title: notifTitle.trim(),
+        message: notifMessage.trim(),
+        type: notifType,
+        user_id: null,
+      });
+      toast.success('Notification saved (email delivery pending)');
       setNotifTitle('');
       setNotifMessage('');
       setNotifType('general');
@@ -248,8 +357,9 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
+          <TabsList className="mb-6 flex-wrap">
             <TabsTrigger value="payments" className="gap-2"><CreditCard className="w-4 h-4" />Payments</TabsTrigger>
+            <TabsTrigger value="overview" className="gap-2"><Eye className="w-4 h-4" />Overview</TabsTrigger>
             <TabsTrigger value="members" className="gap-2"><Users className="w-4 h-4" />Members</TabsTrigger>
             <TabsTrigger value="notifications" className="gap-2"><Bell className="w-4 h-4" />Notifications</TabsTrigger>
             <TabsTrigger value="penalties" className="gap-2"><AlertTriangle className="w-4 h-4" />Penalties</TabsTrigger>
@@ -327,6 +437,83 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
+          {/* MEMBER FINANCIAL OVERVIEW TAB */}
+          <TabsContent value="overview">
+            {loadingSummaries ? (
+              <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin" /></div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid sm:grid-cols-3 gap-4 mb-6">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <p className="text-sm text-muted-foreground">Total Members</p>
+                      <p className="text-2xl font-bold">{memberSummaries.length}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <p className="text-sm text-muted-foreground">Total Collected</p>
+                      <p className="text-2xl font-bold text-green-600">
+                        KSh {memberSummaries.reduce((s, m) => s + m.totalPaid, 0).toLocaleString()}
+                      </p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <p className="text-sm text-muted-foreground">Total Outstanding</p>
+                      <p className="text-2xl font-bold text-red-600">
+                        KSh {memberSummaries.reduce((s, m) => s + m.totalOwed, 0).toLocaleString()}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Eye className="w-5 h-5" />
+                      Member Financial Overview
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="text-left p-3 font-medium">#</th>
+                            <th className="text-left p-3 font-medium">Member</th>
+                            <th className="text-right p-3 font-medium">Paid Months</th>
+                            <th className="text-right p-3 font-medium">Total Paid</th>
+                            <th className="text-right p-3 font-medium">Unpaid Months</th>
+                            <th className="text-right p-3 font-medium">Penalties</th>
+                            <th className="text-right p-3 font-medium">Total Owed</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {memberSummaries.map((member, idx) => (
+                            <tr key={member.memberName} className="border-b hover:bg-muted/50">
+                              <td className="p-3 text-muted-foreground">{idx + 1}</td>
+                              <td className="p-3 font-medium">{member.memberName}</td>
+                              <td className="p-3 text-right text-green-600">{member.paidMonths}</td>
+                              <td className="p-3 text-right text-green-600">KSh {member.totalPaid.toLocaleString()}</td>
+                              <td className="p-3 text-right text-red-600">{member.unpaidMonths}</td>
+                              <td className="p-3 text-right text-orange-600">KSh {member.totalPenalties.toLocaleString()}</td>
+                              <td className="p-3 text-right font-semibold">
+                                <span className={member.totalOwed > 0 ? 'text-red-600' : 'text-green-600'}>
+                                  KSh {member.totalOwed.toLocaleString()}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+          </TabsContent>
+
           {/* MEMBERS TAB */}
           <TabsContent value="members">
             {loadingProfiles ? (
@@ -357,7 +544,7 @@ export default function AdminDashboard() {
                 {profiles.map((profile) => (
                   <Card key={profile.id}>
                     <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between flex-wrap gap-3">
                         <div>
                           <h3 className="font-semibold">{profile.full_name}</h3>
                           <p className="text-sm text-muted-foreground">{profile.email}</p>
@@ -366,13 +553,25 @@ export default function AdminDashboard() {
                             Joined: {profile.join_date ? new Date(profile.join_date).toLocaleDateString() : 'N/A'}
                           </p>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
                           <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${profile.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                             {profile.is_active ? <UserCheck className="w-3 h-3" /> : <UserX className="w-3 h-3" />}
                             {profile.is_active ? 'Active' : 'Inactive'}
                           </span>
                           <Button variant="outline" size="sm" onClick={() => toggleMemberStatus(profile)}>
                             {profile.is_active ? 'Deactivate' : 'Activate'}
+                          </Button>
+                          <Button 
+                            variant="destructive" 
+                            size="sm" 
+                            onClick={() => deleteMember(profile)}
+                            disabled={deletingMember === profile.id}
+                          >
+                            {deletingMember === profile.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <><Trash2 className="w-4 h-4 mr-1" />Delete</>
+                            )}
                           </Button>
                         </div>
                       </div>
@@ -393,6 +592,9 @@ export default function AdminDashboard() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Notifications will be saved in-app. Members will see them when they log in.
+                </p>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Type</label>
                   <Select value={notifType} onValueChange={setNotifType}>
