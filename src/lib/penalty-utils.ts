@@ -43,8 +43,8 @@ export function calculateOutstanding(
   const currentMonthIndex = now.getMonth();
   const currentDay = now.getDate();
 
-  // Start from March 2025 (penalties begin from 10th March)
-  const startYear = 2025;
+  // Start from March 2026 (penalties begin from 10th March 2026)
+  const startYear = 2026;
   const startMonthIndex = 2; // March
 
   const paidSet = new Set(

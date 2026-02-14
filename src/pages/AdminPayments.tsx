@@ -202,8 +202,9 @@ export default function AdminPayments() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="2025">2025</SelectItem>
-              <SelectItem value="2026">2026</SelectItem>
+              {Array.from({ length: 29 }, (_, i) => 2022 + i).map(y => (
+                <SelectItem key={y} value={y.toString()}>{y}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
           <Select value={selectedMonth} onValueChange={setSelectedMonth}>
