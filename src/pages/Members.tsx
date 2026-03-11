@@ -288,7 +288,7 @@
                          <div className="relative w-24 h-24 mx-auto mb-4">
                            <Avatar className="w-full h-full border-2 border-primary/20">
                              <AvatarImage src={imageUrl || undefined} alt={member.full_name} className="object-cover" />
-                             <AvatarFallback className={`text-xl ${member.is_admin ? 'bg-gradient-to-br from-amber-500 to-orange-500' : 'bg-gradient-to-br from-primary to-primary/80'} text-primary-foreground`}>
+                             <AvatarFallback className="text-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
                                {getInitials(member.full_name)}
                              </AvatarFallback>
                            </Avatar>
