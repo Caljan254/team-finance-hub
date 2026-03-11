@@ -1,7 +1,7 @@
 /**
  * Calculate penalties for unpaid months.
  * Rules:
- * - Monthly contribution: KSh 600, due by the 10th
+ * - Monthly contribution: KSh 500, due by the 10th
  * - Late penalty: KSh 10/day after the 10th
  * - Penalties accumulate for all unpaid past months
  */
