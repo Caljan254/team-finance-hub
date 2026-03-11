@@ -334,11 +334,6 @@
                                {getInitials(member.full_name)}
                              </AvatarFallback>
                            </Avatar>
-                           {member.is_admin && (
-                             <div className="absolute -top-1 -right-1">
-                               <Crown className="w-4 h-4 text-amber-500 fill-amber-200" />
-                             </div>
-                           )}
                          </div>
                          <div className="flex-1 min-w-0">
                            <div className="flex items-center gap-2 mb-1">
