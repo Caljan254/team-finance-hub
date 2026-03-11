@@ -68,11 +68,44 @@ export default function Payments() {
       .order('year', { ascending: false })
       .order('month', { ascending: false });
 
+    // Also fetch contribution records for this user
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('user_id', user.id)
+      .single();
+
+    const memberName = profileData?.full_name || '';
+
+    const { data: contributionRecords } = await supabase
+      .from('contribution_records')
+      .select('*')
+      .eq('member_name', memberName)
+      .eq('status', 'paid')
+      .order('year', { ascending: false })
+      .order('month', { ascending: false });
+
+    const records = contributionRecords || [];
+
     if (data) {
       setPayments(data as Payment[]);
-      const outstanding = calculateOutstanding(
-        data.map(p => ({ month: p.month, year: p.year, status: p.status }))
-      );
+
+      // Merge paid months from both sources for penalty calculation
+      const paidFromPayments = data
+        .filter(p => p.status === 'paid')
+        .map(p => ({ month: p.month, year: p.year, status: p.status }));
+      
+      const paidSet = new Set(paidFromPayments.map(p => `${p.month}-${p.year}`));
+      const allPaidMonths = [...paidFromPayments];
+      for (const r of records) {
+        const key = `${r.month}-${r.year}`;
+        if (!paidSet.has(key)) {
+          allPaidMonths.push({ month: r.month, year: r.year, status: 'paid' });
+          paidSet.add(key);
+        }
+      }
+
+      const outstanding = calculateOutstanding(allPaidMonths);
       setBreakdown(outstanding);
     }
     
