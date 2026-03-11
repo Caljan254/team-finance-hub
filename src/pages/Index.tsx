@@ -143,7 +143,7 @@ export default function Index() {
           <div className="max-w-3xl mx-auto space-y-6">
             {[
               { step: '1', title: 'Join The Team', desc: 'Sign up and become a member of our financial collective' },
-              { step: '2', title: 'Monthly Contributions', desc: 'Contribute KSh 600 by the 10th of each month via M-Pesa' },
+              { step: '2', title: 'Monthly Contributions', desc: 'Contribute KSh 500 by the 10th of each month via M-Pesa' },
               { step: '3', title: 'Track Progress', desc: 'Monitor your contributions and the collective fund in real-time' },
               { step: '4', title: 'Grow Together', desc: 'Participate in group investments and access loan facilities' },
             ].map((item, index) => (

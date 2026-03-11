@@ -322,7 +322,7 @@ export default function Dashboard() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Monthly Amount</span>
-                  <span className="font-medium">KSh 600</span>
+                  <span className="font-medium">KSh 500</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Deadline</span>

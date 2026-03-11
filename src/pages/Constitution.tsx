@@ -192,7 +192,7 @@ const constitutionSections = [
     title: 'Books of Record and Reports',
     icon: FileText,
     content: `
-      <p>The group will maintain a register, minutes book, and other records as needed. All records shall be accessible to members upon reasonable notice. An annual report will be prepared and presented at the AGM held in December each year.</p>
+      <p>The group will maintain a register, minutes book, and other records as needed. All records shall be accessible to members upon reasonable notice. An annual report will be prepared and presented at the online AGM held in December each year.</p>
     `,
   },
   {

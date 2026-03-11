@@ -150,7 +150,7 @@ export default function About() {
                 </div>
                 <h3 className="text-xl font-semibold text-foreground mb-2">Join & Contribute</h3>
                 <p className="text-muted-foreground">
-                  Become a member and contribute KSh 600 monthly by the 10th of each month via M-Pesa.
+                  Become a member and contribute KSh 500 monthly by the 10th of each month via M-Pesa.
                 </p>
               </div>
 

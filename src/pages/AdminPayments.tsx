@@ -147,7 +147,7 @@ export default function AdminPayments() {
       member_name: name,
       month: selectedMonth,
       year: parseInt(selectedYear),
-      amount: 600,
+      amount: 500,
       status: 'paid',
       paid_date: new Date().toISOString(),
       marked_by: user?.id,

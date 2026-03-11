@@ -378,7 +378,7 @@ export default function Payments() {
                   </div>
                   <div>
                     <p className="font-medium">Monthly Amount</p>
-                    <p className="text-muted-foreground">KSh 600 due every month</p>
+                    <p className="text-muted-foreground">KSh 500 due every month</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
