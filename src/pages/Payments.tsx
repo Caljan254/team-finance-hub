@@ -46,15 +46,11 @@ export default function Payments() {
   });
 
   useEffect(() => {
-    if (!loading && !user) {
-      navigate('/auth');
-    }
+    if (!loading && !user) navigate('/auth');
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    if (user) {
-      fetchPayments();
-    }
+    if (user) fetchPayments();
   }, [user]);
 
   const fetchPayments = async () => {
@@ -68,7 +64,6 @@ export default function Payments() {
       .order('year', { ascending: false })
       .order('month', { ascending: false });
 
-    // Also fetch contribution records for this user
     const { data: profileData } = await supabase
       .from('profiles')
       .select('full_name')
@@ -85,12 +80,18 @@ export default function Payments() {
       .order('year', { ascending: false })
       .order('month', { ascending: false });
 
+    // Fetch paid penalties
+    const { data: paidPenalties } = await supabase
+      .from('penalties')
+      .select('month, year')
+      .eq('user_id', user.id)
+      .eq('paid', true);
+
     const records = contributionRecords || [];
 
     if (data) {
       setPayments(data as Payment[]);
 
-      // Merge paid months from both sources for penalty calculation
       const paidFromPayments = data
         .filter(p => p.status === 'paid')
         .map(p => ({ month: p.month, year: p.year, status: p.status }));
@@ -105,7 +106,8 @@ export default function Payments() {
         }
       }
 
-      const outstanding = calculateOutstanding(allPaidMonths);
+      const paidPenaltyMonths = (paidPenalties || []).map(p => ({ month: p.month, year: p.year }));
+      const outstanding = calculateOutstanding(allPaidMonths, paidPenaltyMonths);
       setBreakdown(outstanding);
     }
     
@@ -113,7 +115,6 @@ export default function Payments() {
   };
 
   const handlePaymentSuccess = async (_transactionId: string) => {
-    // Payment is already saved by MpesaPaymentModal, just refresh
     fetchPayments();
   };
 
@@ -150,7 +151,6 @@ export default function Payments() {
 
   const currentYear = new Date().getFullYear();
   const currentMonthIndex = new Date().getMonth();
-
   const hasOutstanding = breakdown.grandTotal > 0;
 
   if (loading || loadingPayments) {
@@ -168,7 +168,6 @@ export default function Payments() {
       <Navbar />
       
       <main className="container mx-auto px-4 pt-24 pb-12">
-        {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground flex items-center gap-3">
             <CreditCard className="w-8 h-8 text-primary" />
@@ -180,9 +179,7 @@ export default function Payments() {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left Column - Payment Actions */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Outstanding Balance Card */}
             <Card className="overflow-hidden">
               <div className={`p-6 ${hasOutstanding ? 'bg-gradient-to-r from-destructive/90 to-destructive/70' : 'bg-gradient-to-r from-primary to-accent'} text-primary-foreground`}>
                 <div className="flex items-center justify-between">
@@ -201,9 +198,7 @@ export default function Payments() {
                 </div>
                 <div className="mt-4 flex items-center justify-between">
                   <div>
-                    <p className="text-3xl font-bold">
-                      KSh {breakdown.grandTotal.toLocaleString()}
-                    </p>
+                    <p className="text-3xl font-bold">KSh {breakdown.grandTotal.toLocaleString()}</p>
                     {breakdown.totalPenalties > 0 && (
                       <p className="text-sm text-primary-foreground/80">
                         Includes KSh {breakdown.totalPenalties.toLocaleString()} in penalties
@@ -211,11 +206,7 @@ export default function Payments() {
                     )}
                   </div>
                   {hasOutstanding && (
-                    <Button 
-                      variant="secondary" 
-                      size="lg"
-                      onClick={() => setIsPaymentModalOpen(true)}
-                    >
+                    <Button variant="secondary" size="lg" onClick={() => setIsPaymentModalOpen(true)}>
                       Pay Now
                       <ArrowUpRight className="w-4 h-4 ml-2" />
                     </Button>
@@ -224,15 +215,14 @@ export default function Payments() {
               </div>
             </Card>
 
-            {/* Unpaid Months Breakdown */}
             {breakdown.unpaidMonths.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2 text-destructive">
                     <AlertTriangle className="w-5 h-5" />
-                    Unpaid Penalties Breakdown
+                    Unpaid Breakdown
                   </CardTitle>
-                  <CardDescription>KSh 10/day penalty after the 10th of each month</CardDescription>
+                  <CardDescription>KSh 10/day penalty after the 10th of the following month</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-3">
@@ -246,7 +236,7 @@ export default function Payments() {
                           <p className="text-sm text-muted-foreground">
                             {item.penaltyDays > 0 
                               ? `${item.penaltyDays} day${item.penaltyDays > 1 ? 's' : ''} overdue`
-                              : 'Due by the 10th'
+                              : 'Not yet due for penalty'
                             }
                           </p>
                         </div>
@@ -261,7 +251,6 @@ export default function Payments() {
                         </div>
                       </div>
                     ))}
-                    {/* Total row */}
                     <div className="flex items-center justify-between p-4 rounded-xl bg-destructive/10 border border-destructive/20 font-semibold">
                       <p>Total Due</p>
                       <p className="text-lg">KSh {breakdown.grandTotal.toLocaleString()}</p>
@@ -271,7 +260,6 @@ export default function Payments() {
               </Card>
             )}
 
-            {/* Payment Calendar */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -332,7 +320,6 @@ export default function Payments() {
               </CardContent>
             </Card>
 
-            {/* Payment History */}
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
@@ -351,10 +338,7 @@ export default function Payments() {
                 {payments.length > 0 ? (
                   <div className="space-y-3">
                     {payments.map((payment) => (
-                      <div
-                        key={payment.id}
-                        className="flex items-center justify-between p-4 rounded-xl bg-muted/50"
-                      >
+                      <div key={payment.id} className="flex items-center justify-between p-4 rounded-xl bg-muted/50">
                         <div>
                           <p className="font-medium">{payment.month} {payment.year}</p>
                           <p className="text-sm text-muted-foreground">
@@ -370,17 +354,11 @@ export default function Payments() {
                           )}
                         </div>
                         <div className="text-right">
-                          <p className="font-semibold">
-                            KSh {Number(payment.total_amount).toLocaleString()}
-                          </p>
+                          <p className="font-semibold">KSh {Number(payment.total_amount).toLocaleString()}</p>
                           {Number(payment.penalty_amount) > 0 && (
-                            <p className="text-xs text-destructive">
-                              +KSh {Number(payment.penalty_amount)} penalty
-                            </p>
+                            <p className="text-xs text-destructive">+KSh {Number(payment.penalty_amount)} penalty</p>
                           )}
-                          <div className="mt-1">
-                            {getStatusBadge(payment.status)}
-                          </div>
+                          <div className="mt-1">{getStatusBadge(payment.status)}</div>
                         </div>
                       </div>
                     ))}
@@ -396,7 +374,6 @@ export default function Payments() {
             </Card>
           </div>
 
-          {/* Right Column - Countdown & Info */}
           <div className="space-y-6">
             <CountdownTimer />
 
@@ -420,7 +397,7 @@ export default function Payments() {
                   </div>
                   <div>
                     <p className="font-medium">Deadline</p>
-                    <p className="text-muted-foreground">Pay by the 10th of each month</p>
+                    <p className="text-muted-foreground">Pay by the 10th of the following month</p>
                   </div>
                 </div>
                 <div className="flex gap-3">
