@@ -296,7 +296,7 @@
                           <h3 className="font-semibold text-lg text-foreground mb-1">
                             {member.full_name}
                           </h3>
-                         <div className="mt-2 mb-3">{getStatusBadge(member.payment_status)}</div>
+                         <div className="mt-2 mb-3">{getStatusBadge()}</div>
                        </div>
                        <div className="mt-4 space-y-3 text-sm">
                          <div className="flex items-center gap-2 text-muted-foreground p-2 bg-muted/50 rounded">
