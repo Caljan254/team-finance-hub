@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Shield, Users, Bell, CreditCard, CheckCircle, XCircle, Plus, 
-  Loader2, UserCheck, UserX, Send, AlertTriangle, Trash2, Eye
+  Loader2, UserCheck, UserX, Send, AlertTriangle, Trash2, Eye, DollarSign
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { calculateOutstanding } from '@/lib/penalty-utils';
@@ -50,6 +50,19 @@ interface MemberFinancialSummary {
   unpaidMonths: number;
 }
 
+interface PenaltyRecord {
+  id: string;
+  user_id: string;
+  month: string;
+  year: number;
+  days_overdue: number;
+  daily_penalty: number;
+  total_penalty: number;
+  paid: boolean;
+  paid_date: string | null;
+  member_name?: string;
+}
+
 export default function AdminDashboard() {
   const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
@@ -80,6 +93,11 @@ export default function AdminDashboard() {
   const [memberSummaries, setMemberSummaries] = useState<MemberFinancialSummary[]>([]);
   const [loadingSummaries, setLoadingSummaries] = useState(false);
 
+  // Penalties state
+  const [penaltyRecords, setPenaltyRecords] = useState<PenaltyRecord[]>([]);
+  const [loadingPenalties, setLoadingPenalties] = useState(false);
+  const [savingPenalty, setSavingPenalty] = useState<string | null>(null);
+
   useEffect(() => {
     if (!authLoading && !user) navigate('/auth');
   }, [user, authLoading, navigate]);
@@ -93,6 +111,8 @@ export default function AdminDashboard() {
       if (activeTab === 'payments') fetchPaymentData();
       if (activeTab === 'members') fetchProfiles();
       if (activeTab === 'overview') fetchMemberOverview();
+      if (activeTab === 'penalties') { fetchPaymentData(); fetchPenalties(); }
+      if (activeTab === 'penalties_collected') fetchPenalties();
     }
   }, [isAdmin, activeTab, selectedYear, selectedMonth]);
 
@@ -137,7 +157,7 @@ export default function AdminDashboard() {
         member_name: memberName,
         month: selectedMonth,
         year: parseInt(selectedYear),
-        amount: 600,
+        amount: 500,
         status: 'paid',
         paid_date: new Date().toISOString(),
         marked_by: user.id,
@@ -162,7 +182,7 @@ export default function AdminDashboard() {
       member_name: name,
       month: selectedMonth,
       year: parseInt(selectedYear),
-      amount: 600,
+      amount: 500,
       status: 'paid',
       paid_date: new Date().toISOString(),
       marked_by: user?.id,
@@ -200,21 +220,15 @@ export default function AdminDashboard() {
   };
 
   const deleteMember = async (profile: Profile) => {
-    if (!confirm(`Are you sure you want to PERMANENTLY delete ${profile.full_name}? This will remove their profile, roles, payments, and all associated data. This action cannot be undone!`)) {
-      return;
-    }
+    if (!confirm(`Are you sure you want to PERMANENTLY delete ${profile.full_name}? This action cannot be undone!`)) return;
     setDeletingMember(profile.id);
     
-    // Delete related data first
     await supabase.from('notifications').delete().eq('user_id', profile.user_id);
     await supabase.from('payments').delete().eq('user_id', profile.user_id);
     await supabase.from('penalties').delete().eq('user_id', profile.user_id);
     await supabase.from('user_roles').delete().eq('user_id', profile.user_id);
-    
-    // Delete contribution records by name
     await supabase.from('contribution_records').delete().eq('member_name', profile.full_name);
     
-    // Delete profile
     const { error } = await supabase.from('profiles').delete().eq('id', profile.id);
     
     if (error) {
@@ -230,7 +244,6 @@ export default function AdminDashboard() {
   const fetchMemberOverview = async () => {
     setLoadingSummaries(true);
     
-    // Get all contribution records
     const { data: allRecs } = await supabase
       .from('contribution_records')
       .select('*')
@@ -242,9 +255,8 @@ export default function AdminDashboard() {
       const summaries: MemberFinancialSummary[] = memberNames.map(name => {
         const memberRecs = allRecs.filter(r => r.member_name === name);
         const paidRecs = memberRecs.filter(r => r.status === 'paid');
-        const totalPaid = paidRecs.reduce((sum, r) => sum + Number(r.amount), 0);
+        const totalPaid = paidRecs.length * 500;
         
-        // Calculate outstanding using penalty-utils
         const breakdown = calculateOutstanding(
           paidRecs.map(r => ({ month: r.month, year: r.year, status: r.status }))
         );
@@ -264,6 +276,113 @@ export default function AdminDashboard() {
     setLoadingSummaries(false);
   };
 
+  // --- PENALTIES ---
+  const fetchPenalties = async () => {
+    setLoadingPenalties(true);
+    const { data } = await supabase
+      .from('penalties')
+      .select('*')
+      .order('year', { ascending: false })
+      .order('month', { ascending: false });
+
+    if (data) {
+      // Map user_ids to member names
+      const userIds = [...new Set(data.map(p => p.user_id))];
+      const { data: profilesData } = await supabase
+        .from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', userIds);
+
+      const nameMap = new Map((profilesData || []).map(p => [p.user_id, p.full_name]));
+      
+      setPenaltyRecords(data.map(p => ({
+        ...p,
+        days_overdue: p.days_overdue || 0,
+        daily_penalty: p.daily_penalty || 10,
+        total_penalty: p.total_penalty || 0,
+        paid: p.paid || false,
+        member_name: nameMap.get(p.user_id) || 'Unknown',
+      })) as PenaltyRecord[]);
+    }
+    setLoadingPenalties(false);
+  };
+
+  const markPenaltyPaid = async (penaltyId: string) => {
+    setSavingPenalty(penaltyId);
+    const { error } = await supabase
+      .from('penalties')
+      .update({ paid: true, paid_date: new Date().toISOString() })
+      .eq('id', penaltyId);
+
+    if (error) {
+      toast.error('Failed to mark penalty as paid');
+    } else {
+      toast.success('Penalty marked as paid');
+      fetchPenalties();
+    }
+    setSavingPenalty(null);
+  };
+
+  const markPenaltyUnpaid = async (penaltyId: string) => {
+    setSavingPenalty(penaltyId);
+    const { error } = await supabase
+      .from('penalties')
+      .update({ paid: false, paid_date: null })
+      .eq('id', penaltyId);
+
+    if (error) {
+      toast.error('Failed to update');
+    } else {
+      toast.success('Penalty marked as unpaid');
+      fetchPenalties();
+    }
+    setSavingPenalty(null);
+  };
+
+  const createPenaltyRecord = async (memberName: string, month: string, year: number, daysOverdue: number) => {
+    // Find user_id from profiles
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('full_name', memberName)
+      .single();
+
+    if (!profileData) {
+      toast.error(`No profile found for ${memberName}`);
+      return;
+    }
+
+    // Check if penalty already exists
+    const { data: existing } = await supabase
+      .from('penalties')
+      .select('id')
+      .eq('user_id', profileData.user_id)
+      .eq('month', month)
+      .eq('year', year)
+      .single();
+
+    if (existing) {
+      // Update existing
+      await supabase.from('penalties').update({
+        days_overdue: daysOverdue,
+        total_penalty: daysOverdue * 10,
+      }).eq('id', existing.id);
+    } else {
+      await supabase.from('penalties').insert({
+        user_id: profileData.user_id,
+        month,
+        year,
+        days_overdue: daysOverdue,
+        daily_penalty: 10,
+        total_penalty: daysOverdue * 10,
+        paid: false,
+      });
+    }
+
+    toast.success(`Penalty recorded for ${memberName}`);
+    fetchPenalties();
+  };
+
   // --- NOTIFICATIONS ---
   const sendNotification = async () => {
     if (!notifTitle.trim() || !notifMessage.trim()) {
@@ -273,7 +392,6 @@ export default function AdminDashboard() {
     setSendingNotif(true);
 
     try {
-      // Call edge function to send notifications + emails
       const { data: sessionData } = await supabase.auth.getSession();
       const token = sessionData?.session?.access_token;
 
@@ -304,7 +422,6 @@ export default function AdminDashboard() {
         toast.error('Failed to send: ' + (result.error || 'Unknown error'));
       }
     } catch (err) {
-      // Fallback: just save to DB
       await supabase.from('notifications').insert({
         title: notifTitle.trim(),
         message: notifMessage.trim(),
@@ -344,6 +461,10 @@ export default function AdminDashboard() {
   const paidMembers = records.map(r => r.member_name);
   const unpaidMembers = allMembers.filter(m => !paidMembers.includes(m));
 
+  // Penalties collected stats
+  const totalPenaltiesCollected = penaltyRecords.filter(p => p.paid).reduce((s, p) => s + Number(p.total_penalty), 0);
+  const totalPenaltiesOutstanding = penaltyRecords.filter(p => !p.paid).reduce((s, p) => s + Number(p.total_penalty), 0);
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -363,6 +484,7 @@ export default function AdminDashboard() {
             <TabsTrigger value="members" className="gap-2"><Users className="w-4 h-4" />Members</TabsTrigger>
             <TabsTrigger value="notifications" className="gap-2"><Bell className="w-4 h-4" />Notifications</TabsTrigger>
             <TabsTrigger value="penalties" className="gap-2"><AlertTriangle className="w-4 h-4" />Penalties</TabsTrigger>
+            <TabsTrigger value="penalties_collected" className="gap-2"><DollarSign className="w-4 h-4" />Penalties Collected</TabsTrigger>
           </TabsList>
 
           {/* PAYMENTS TAB */}
@@ -400,7 +522,7 @@ export default function AdminDashboard() {
               <Card>
                 <CardContent className="pt-6">
                   <p className="text-sm text-muted-foreground">Total Collected</p>
-                  <p className="text-2xl font-bold">KSh {(paidMembers.length * 600).toLocaleString()}</p>
+                  <p className="text-2xl font-bold">KSh {(paidMembers.length * 500).toLocaleString()}</p>
                 </CardContent>
               </Card>
             </div>
@@ -594,7 +716,7 @@ export default function AdminDashboard() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <p className="text-sm text-muted-foreground">
-                  Notifications will be saved in-app. Members will see them when they log in.
+                  Notifications will be saved in-app and sent via email.
                 </p>
                 <div>
                   <label className="text-sm font-medium mb-1 block">Type</label>
@@ -623,9 +745,86 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          {/* PENALTIES TAB */}
+          {/* PENALTIES TAB - with mark as paid */}
           <TabsContent value="penalties">
-            <PenaltiesTab selectedMonth={selectedMonth} selectedYear={selectedYear} allMembers={allMembers} paidMembers={paidMembers} />
+            <PenaltiesTab 
+              selectedMonth={selectedMonth} 
+              selectedYear={selectedYear} 
+              allMembers={allMembers} 
+              paidMembers={paidMembers}
+              onCreatePenalty={createPenaltyRecord}
+              penaltyRecords={penaltyRecords}
+              onMarkPaid={markPenaltyPaid}
+              onMarkUnpaid={markPenaltyUnpaid}
+              savingPenalty={savingPenalty}
+            />
+          </TabsContent>
+
+          {/* PENALTIES COLLECTED TAB */}
+          <TabsContent value="penalties_collected">
+            {loadingPenalties ? (
+              <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin" /></div>
+            ) : (
+              <div className="space-y-4">
+                <div className="grid sm:grid-cols-3 gap-4 mb-6">
+                  <Card>
+                    <CardContent className="pt-6">
+                      <p className="text-sm text-muted-foreground">Total Penalties Collected</p>
+                      <p className="text-2xl font-bold text-green-600">KSh {totalPenaltiesCollected.toLocaleString()}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <p className="text-sm text-muted-foreground">Outstanding Penalties</p>
+                      <p className="text-2xl font-bold text-red-600">KSh {totalPenaltiesOutstanding.toLocaleString()}</p>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <p className="text-sm text-muted-foreground">Total Penalty Records</p>
+                      <p className="text-2xl font-bold">{penaltyRecords.length}</p>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <DollarSign className="w-5 h-5" />
+                      Penalty Payment History
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    {penaltyRecords.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
+                        <p>No penalty records yet</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {penaltyRecords.map((penalty) => (
+                          <div key={penalty.id} className={`flex items-center justify-between p-3 rounded-lg border ${penalty.paid ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                            <div>
+                              <span className="font-medium">{penalty.member_name}</span>
+                              <p className="text-sm text-muted-foreground">{penalty.month} {penalty.year} — {penalty.days_overdue} days overdue</p>
+                              {penalty.paid && penalty.paid_date && (
+                                <p className="text-xs text-green-600">Paid on {new Date(penalty.paid_date).toLocaleDateString()}</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <span className="font-semibold">KSh {Number(penalty.total_penalty).toLocaleString()}</span>
+                              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${penalty.paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                {penalty.paid ? <><CheckCircle className="w-3 h-3" />Paid</> : <><AlertTriangle className="w-3 h-3" />Unpaid</>}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            )}
           </TabsContent>
         </Tabs>
       </main>
@@ -635,35 +834,55 @@ export default function AdminDashboard() {
 }
 
 // Penalties sub-component
-function PenaltiesTab({ selectedMonth, selectedYear, allMembers, paidMembers }: { selectedMonth: string; selectedYear: string; allMembers: string[]; paidMembers: string[] }) {
+function PenaltiesTab({ 
+  selectedMonth, selectedYear, allMembers, paidMembers, onCreatePenalty, penaltyRecords, onMarkPaid, onMarkUnpaid, savingPenalty 
+}: { 
+  selectedMonth: string; selectedYear: string; allMembers: string[]; paidMembers: string[];
+  onCreatePenalty: (name: string, month: string, year: number, days: number) => void;
+  penaltyRecords: PenaltyRecord[];
+  onMarkPaid: (id: string) => void;
+  onMarkUnpaid: (id: string) => void;
+  savingPenalty: string | null;
+}) {
   const today = new Date();
-  const currentDay = today.getDate();
-  const isOverDeadline = currentDay > 10;
-  const daysLate = isOverDeadline ? currentDay - 10 : 0;
+  
+  // Penalty logic: For selected month, deadline is 10th of NEXT month
+  const monthIndex = MONTHS.indexOf(selectedMonth);
+  let deadlineMonth = monthIndex + 1;
+  let deadlineYear = parseInt(selectedYear);
+  if (deadlineMonth > 11) {
+    deadlineMonth = 0;
+    deadlineYear++;
+  }
+  
+  const deadlineDate = new Date(deadlineYear, deadlineMonth, 10, 23, 59, 59);
+  const isOverDeadline = today > deadlineDate;
+  const daysLate = isOverDeadline ? Math.floor((today.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
   const penaltyPerDay = 10;
 
   const unpaidMembers = allMembers.filter(m => !paidMembers.includes(m));
-  const currentMonth = today.toLocaleString('en-US', { month: 'long' });
-  const currentYear = today.getFullYear().toString();
-  const isCurrentPeriod = selectedMonth === currentMonth && selectedYear === currentYear;
+
+  // Get penalty records for this month
+  const monthPenalties = penaltyRecords.filter(p => p.month === selectedMonth && p.year === parseInt(selectedYear));
 
   return (
     <div>
-      {isCurrentPeriod && isOverDeadline && unpaidMembers.length > 0 && (
+      {isOverDeadline && unpaidMembers.length > 0 && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="w-5 h-5 text-red-600" />
-            <h3 className="font-semibold text-red-800">Penalty Alert - {daysLate} days past deadline</h3>
+            <h3 className="font-semibold text-red-800">Penalty Alert — {daysLate} days past deadline</h3>
           </div>
           <p className="text-sm text-red-700">
-            {unpaidMembers.length} member(s) have not paid. Penalty: KSh {penaltyPerDay}/day = KSh {daysLate * penaltyPerDay} accumulated per member.
+            Deadline for {selectedMonth} {selectedYear} was {MONTHS[deadlineMonth]} 10, {deadlineYear}. 
+            {unpaidMembers.length} member(s) haven't paid. Penalty: KSh {penaltyPerDay}/day = KSh {(daysLate * penaltyPerDay).toLocaleString()} per member.
           </p>
         </div>
       )}
 
       <Card>
         <CardHeader>
-          <CardTitle>Unpaid Members - {selectedMonth} {selectedYear}</CardTitle>
+          <CardTitle>Unpaid Members — {selectedMonth} {selectedYear}</CardTitle>
         </CardHeader>
         <CardContent>
           {unpaidMembers.length === 0 ? (
@@ -673,19 +892,41 @@ function PenaltiesTab({ selectedMonth, selectedYear, allMembers, paidMembers }: 
             </div>
           ) : (
             <div className="space-y-2">
-              {unpaidMembers.map((name, idx) => (
-                <div key={name} className="flex items-center justify-between p-3 rounded-lg border bg-red-50 border-red-100">
-                  <div>
-                    <span className="text-sm text-muted-foreground mr-2">{idx + 1}.</span>
-                    <span className="font-medium">{name}</span>
+              {unpaidMembers.map((name, idx) => {
+                const existingPenalty = monthPenalties.find(p => p.member_name === name);
+                const isSaving = savingPenalty === existingPenalty?.id;
+                
+                return (
+                  <div key={name} className="flex items-center justify-between p-3 rounded-lg border bg-red-50 border-red-100">
+                    <div>
+                      <span className="text-sm text-muted-foreground mr-2">{idx + 1}.</span>
+                      <span className="font-medium">{name}</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {isOverDeadline && (
+                        <span className="text-sm font-medium text-red-600">
+                          Penalty: KSh {(daysLate * penaltyPerDay).toLocaleString()}
+                        </span>
+                      )}
+                      {existingPenalty ? (
+                        existingPenalty.paid ? (
+                          <Button variant="outline" size="sm" onClick={() => onMarkUnpaid(existingPenalty.id)} disabled={isSaving} className="bg-green-100 text-green-800 border-green-300">
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-1" />Paid</>}
+                          </Button>
+                        ) : (
+                          <Button variant="outline" size="sm" onClick={() => onMarkPaid(existingPenalty.id)} disabled={isSaving} className="text-red-600 border-red-300 hover:bg-red-100">
+                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Mark Paid'}
+                          </Button>
+                        )
+                      ) : isOverDeadline ? (
+                        <Button variant="outline" size="sm" onClick={() => onCreatePenalty(name, selectedMonth, parseInt(selectedYear), daysLate)} className="text-orange-600 border-orange-300 hover:bg-orange-100">
+                          Record Penalty
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
-                  {isCurrentPeriod && isOverDeadline && (
-                    <span className="text-sm font-medium text-red-600">
-                      Penalty: KSh {(daysLate * penaltyPerDay).toLocaleString()}
-                    </span>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>

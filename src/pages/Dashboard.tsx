@@ -67,22 +67,18 @@ export default function Dashboard() {
 
   const fetchProfile = async () => {
     if (!user) return;
-    
     const { data } = await supabase
       .from('profiles')
       .select('full_name')
       .eq('user_id', user.id)
       .single();
-    
-    if (data) {
-      setProfile(data);
-    }
+    if (data) setProfile(data);
   };
 
   const fetchPaymentData = async () => {
     if (!user) return;
 
-    // Fetch ALL payments to calculate total contributed since joining
+    // Fetch payments
     const { data: allPayments } = await supabase
       .from('payments')
       .select('*')
@@ -90,18 +86,7 @@ export default function Dashboard() {
       .order('year', { ascending: false })
       .order('month', { ascending: false });
 
-    // Also fetch contribution records marked as paid for this user
-    const { data: contributionRecords } = await supabase
-      .from('contribution_records')
-      .select('*')
-      .eq('status', 'paid')
-      .order('year', { ascending: false })
-      .order('month', { ascending: false });
-
-    const payments = allPayments || [];
-    const records = contributionRecords || [];
-
-    // Get profile name to match contribution records
+    // Get profile name
     const { data: profileData } = await supabase
       .from('profiles')
       .select('full_name')
@@ -110,22 +95,36 @@ export default function Dashboard() {
 
     const memberName = profileData?.full_name || '';
 
-    // Build paid months from both payments table and contribution_records
+    // Fetch contribution records for this member
+    const { data: contributionRecords } = await supabase
+      .from('contribution_records')
+      .select('*')
+      .eq('member_name', memberName)
+      .eq('status', 'paid')
+      .order('year', { ascending: false })
+      .order('month', { ascending: false });
+
+    // Fetch paid penalties for this user
+    const { data: paidPenalties } = await supabase
+      .from('penalties')
+      .select('month, year')
+      .eq('user_id', user.id)
+      .eq('paid', true);
+
+    const payments = allPayments || [];
+    const records = contributionRecords || [];
+
+    // Build paid months from both sources
     const paidFromPayments = payments
       .filter(p => p.status === 'paid')
       .map(p => ({ month: p.month, year: p.year, status: p.status }));
     
-    const paidFromRecords = records
-      .filter(r => r.member_name === memberName && r.status === 'paid')
-      .map(r => ({ month: r.month, year: r.year, status: r.status }));
-
-    // Merge paid months (deduplicate)
     const paidSet = new Set(paidFromPayments.map(p => `${p.month}-${p.year}`));
     const allPaidMonths = [...paidFromPayments];
-    for (const r of paidFromRecords) {
+    for (const r of records) {
       const key = `${r.month}-${r.year}`;
       if (!paidSet.has(key)) {
-        allPaidMonths.push(r);
+        allPaidMonths.push({ month: r.month, year: r.year, status: 'paid' });
         paidSet.add(key);
       }
     }
@@ -133,20 +132,17 @@ export default function Dashboard() {
     // Total contributed = count of paid months * 500
     const totalPaid = allPaidMonths.length * 500;
     
-    const totalPenalties = payments.reduce((sum, p) => sum + Number(p.penalty_amount || 0), 0);
-    
     const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
     const currentYear = new Date().getFullYear();
-    const currentPaidFromRecords = paidFromRecords.some(r => r.month === currentMonth && r.year === currentYear);
-    const currentPayment = payments.find(p => p.month === currentMonth && p.year === currentYear);
-    const currentMonthPaid = currentPaidFromRecords || currentPayment?.status === 'paid';
+    const currentMonthPaid = allPaidMonths.some(p => p.month === currentMonth && p.year === currentYear);
     
-    const outstanding = calculateOutstanding(allPaidMonths);
+    // Calculate outstanding with paid penalties
+    const paidPenaltyMonths = (paidPenalties || []).map(p => ({ month: p.month, year: p.year }));
+    const outstanding = calculateOutstanding(allPaidMonths, paidPenaltyMonths);
     setBreakdown(outstanding);
 
-    // Build recent payments list from contribution records for this member
+    // Build recent payments from contribution records
     const recentFromRecords = records
-      .filter(r => r.member_name === memberName)
       .slice(0, 5)
       .map(r => ({
         id: r.id,
@@ -157,7 +153,6 @@ export default function Dashboard() {
         paid_date: r.paid_date,
       }));
 
-    // Fall back to payments table if no contribution records
     const recentPayments = recentFromRecords.length > 0 
       ? recentFromRecords 
       : payments.slice(0, 5).map(p => ({
@@ -172,17 +167,12 @@ export default function Dashboard() {
     setPaymentSummary({
       totalPaid,
       totalPenalties: outstanding.totalPenalties,
-      currentMonthStatus: currentMonthPaid ? 'paid' : (currentPayment?.status as 'paid' | 'pending' | 'overdue') || 'pending',
+      currentMonthStatus: currentMonthPaid ? 'paid' : 'pending',
       recentPayments,
     });
   };
 
-  const getCurrentMonth = () => {
-    return new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
-  };
-
   const handlePaymentSuccess = async (_transactionId: string) => {
-    // Payment is saved by MpesaPaymentModal, just refresh
     fetchPaymentData();
   };
 
@@ -227,7 +217,6 @@ export default function Dashboard() {
       <Navbar />
       
       <main className="container mx-auto px-4 pt-24 pb-12">
-        {/* Welcome Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-foreground">
             Welcome back, {profile?.full_name?.split(' ')[0] || 'Member'}!
@@ -236,9 +225,7 @@ export default function Dashboard() {
         </div>
 
         <div className="grid lg:grid-cols-3 gap-6">
-          {/* Left Column - Stats & Quick Actions */}
           <div className="lg:col-span-2 space-y-6">
-            {/* Stats Cards */}
             <div className="grid sm:grid-cols-3 gap-4">
               <Card>
                 <CardContent className="pt-6">
@@ -289,7 +276,6 @@ export default function Dashboard() {
               </Card>
             </div>
 
-            {/* Quick Pay Card */}
             <Card className="overflow-hidden">
               <div className={`p-6 text-primary-foreground ${breakdown.grandTotal > 0 ? 'bg-gradient-to-r from-destructive/90 to-destructive/70' : 'bg-gradient-to-r from-primary to-accent'}`}>
                 <div className="flex items-center justify-between">
@@ -329,7 +315,6 @@ export default function Dashboard() {
               </div>
             </Card>
 
-            {/* Recent Payments */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -373,7 +358,6 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Right Column - Countdown & Info */}
           <div className="space-y-6">
             <CountdownTimer />
 
@@ -388,7 +372,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Deadline</span>
-                  <span className="font-medium">10th of each month</span>
+                  <span className="font-medium">10th of next month</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Late Penalty</span>
@@ -409,7 +393,7 @@ export default function Dashboard() {
                   </div>
                   <h4 className="font-semibold text-foreground">Stay on Track!</h4>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Pay before the 10th to avoid daily penalties. Every contribution counts towards our collective goal.
+                    Pay before the 10th of next month to avoid daily penalties. Every contribution counts towards our collective goal.
                   </p>
                 </div>
               </CardContent>
