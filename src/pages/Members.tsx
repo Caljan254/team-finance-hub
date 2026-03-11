@@ -219,15 +219,9 @@
                  <Users className="w-8 h-8 text-primary" />
                  Members Directory
                </h1>
-               <p className="text-muted-foreground mt-1">
-                 {members.length} active members ({adminCount} administrators)
-                 {isAdmin && (
-                   <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                     <Shield className="w-3 h-3" />
-                     Admin
-                   </span>
-                 )}
-               </p>
+                <p className="text-muted-foreground mt-1">
+                  {members.length} active members
+                </p>
              </div>
              <div className="flex flex-wrap gap-2">
                <Button onClick={exportMembersToCSV} variant="outline" size="sm" className="gap-2">
