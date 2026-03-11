@@ -28,7 +28,7 @@ const features = [
 ];
 
 const stats = [
-  { value: 'KSh 600', label: 'Monthly Contribution' },
+  { value: 'KSh 500', label: 'Monthly Contribution' },
   { value: '10th', label: 'Payment Deadline' },
   { value: '12+', label: 'Active Members' },
   { value: '2025', label: 'Established' },
