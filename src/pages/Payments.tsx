@@ -220,7 +220,7 @@ export default function Payments() {
                         <div className="text-right">
                           <p className="font-semibold">KSh {item.totalDue.toLocaleString()}</p>
                           <div className="text-xs text-muted-foreground">
-                            <span>600 contribution</span>
+                            <span>500 contribution</span>
                             {item.penaltyAmount > 0 && (
                               <span className="text-destructive"> + {item.penaltyAmount.toLocaleString()} penalty</span>
                             )}
