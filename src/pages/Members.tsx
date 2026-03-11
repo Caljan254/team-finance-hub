@@ -185,31 +185,14 @@
      (member.phone && member.phone.includes(searchTerm))
    );
  
-   const getStatusBadge = (status?: string) => {
-     switch (status) {
-       case 'paid':
-         return (
-           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-             <CheckCircle className="w-3 h-3" />
-             Paid
-           </span>
-         );
-       case 'overdue':
-         return (
-           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
-             <AlertTriangle className="w-3 h-3" />
-             Overdue
-           </span>
-         );
-       default:
-         return (
-           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-             <Clock className="w-3 h-3" />
-             Pending
-           </span>
-         );
-     }
-   };
+  const getStatusBadge = () => {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+        <CheckCircle className="w-3 h-3" />
+        Active
+      </span>
+    );
+  };
  
    const getInitials = (name: string) => {
      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
