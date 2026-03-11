@@ -330,7 +330,7 @@
                          <div className="relative">
                            <Avatar className="w-12 h-12 border border-primary/20">
                              <AvatarImage src={imageUrl || undefined} alt={member.full_name} className="object-cover" />
-                             <AvatarFallback className={`${member.is_admin ? 'bg-gradient-to-br from-amber-500 to-orange-500' : 'bg-gradient-to-br from-primary to-primary/80'} text-primary-foreground`}>
+                             <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
                                {getInitials(member.full_name)}
                              </AvatarFallback>
                            </Avatar>
