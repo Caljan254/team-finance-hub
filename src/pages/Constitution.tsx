@@ -144,7 +144,8 @@ const constitutionSections = [
     icon: Calendar,
     content: `
       <ul>
-        <li>Group meetings will be held on the <strong>11th of every month</strong></li>
+        <li>Group meetings will be held <strong>online on the 11th of every month</strong></li>
+        <li>The annual general meeting (AGM) will also be conducted <strong>online</strong>, held in December each year</li>
         <li>Failure to attend a scheduled meeting without valid reason will attract a fine of <strong>KSh 50</strong>, which will be deducted from the member's shares. If this continues, further fines will accumulate daily.</li>
       </ul>
     `,
