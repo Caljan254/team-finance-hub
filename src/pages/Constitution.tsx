@@ -157,7 +157,7 @@ const constitutionSections = [
       <p>The group shall generate income through:</p>
       <ul>
         <li>KSh 200 registration fee</li>
-        <li>KSh 500 (minimum) monthly savings</li>
+        <li>KSh 500 monthly savings</li>
         <li>Grants/Loans from government and NGOs</li>
         <li>Fundraising and donations from well-wishers</li>
         <li>Profit from the group's I.G.As</li>
