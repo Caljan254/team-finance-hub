@@ -1,9 +1,11 @@
 /**
  * Calculate penalties for unpaid months.
  * Rules:
- * - Monthly contribution: KSh 500, due by the 10th
- * - Late penalty: KSh 10/day after the 10th
+ * - Monthly contribution: KSh 500, due by the 10th of the NEXT month
+ * - e.g. February contribution deadline is March 10th
+ * - Late penalty: KSh 10/day after the deadline
  * - Penalties accumulate for all unpaid past months
+ * - If penalty is marked as paid in penalties table, stop counting
  */
 
 const MONTHLY_AMOUNT = 500;
@@ -32,18 +34,23 @@ export interface PaymentBreakdown {
 }
 
 /**
- * Given a list of paid month/year combos, calculate what's owed.
+ * Given a list of paid month/year combos and paid penalties, calculate what's owed.
  * Starts from January 2025 (group start) up to current month.
+ * 
+ * Penalty logic: For month X, the deadline is the 10th of month X+1.
+ * Penalties start from the 11th of month X+1.
+ * e.g. February 2026 contribution deadline = March 10, 2026. Penalties from March 11.
  */
 export function calculateOutstanding(
-  paidMonths: Array<{ month: string; year: number; status: string }>
+  paidMonths: Array<{ month: string; year: number; status: string }>,
+  paidPenaltyMonths?: Array<{ month: string; year: number }>
 ): PaymentBreakdown {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonthIndex = now.getMonth();
   const currentDay = now.getDate();
 
-  // Start from March 2026 (penalties begin from 10th March 2026)
+  // Start from March 2026
   const startYear = 2026;
   const startMonthIndex = 2; // March
 
@@ -51,6 +58,10 @@ export function calculateOutstanding(
     paidMonths
       .filter(p => p.status === 'paid')
       .map(p => `${p.month}-${p.year}`)
+  );
+
+  const paidPenaltySet = new Set(
+    (paidPenaltyMonths || []).map(p => `${p.month}-${p.year}`)
   );
 
   const unpaidMonths: UnpaidMonth[] = [];
@@ -63,22 +74,28 @@ export function calculateOutstanding(
     const key = `${monthName}-${year}`;
 
     if (!paidSet.has(key)) {
-      // Calculate penalty days
+      // Deadline for this month's contribution is the 10th of the NEXT month
+      let deadlineMonth = monthIndex + 1;
+      let deadlineYear = year;
+      if (deadlineMonth > 11) {
+        deadlineMonth = 0;
+        deadlineYear++;
+      }
+
       let penaltyDays = 0;
 
-      if (year < currentYear || monthIndex < currentMonthIndex) {
-        // Past month: penalty from the 11th of that month to end of that month,
-        // plus all days in subsequent months up to today
-        const deadlineDate = new Date(year, monthIndex, DEADLINE_DAY);
-        const daysSinceDeadline = Math.floor(
-          (now.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24)
-        );
-        penaltyDays = Math.max(0, daysSinceDeadline);
-      } else {
-        // Current month: only penalize if past the 10th
-        if (currentDay > DEADLINE_DAY) {
-          penaltyDays = currentDay - DEADLINE_DAY;
+      // Only calculate penalty if penalty hasn't been marked as paid
+      if (!paidPenaltySet.has(key)) {
+        const deadlineDate = new Date(deadlineYear, deadlineMonth, DEADLINE_DAY);
+
+        if (now > deadlineDate) {
+          // Past the deadline - count days since deadline
+          const daysSinceDeadline = Math.floor(
+            (now.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24)
+          );
+          penaltyDays = Math.max(0, daysSinceDeadline);
         }
+        // If we haven't passed the deadline yet, no penalty
       }
 
       const penaltyAmount = penaltyDays * DAILY_PENALTY;

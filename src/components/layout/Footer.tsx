@@ -1,11 +1,11 @@
 import { Link } from 'react-router-dom';
-import { Users, Mail, Phone, MapPin, Facebook, Twitter, Instagram } from 'lucide-react';
+import { Users, Mail, Phone, MapPin } from 'lucide-react';
 
 export function Footer() {
   return (
     <footer className="bg-sidebar text-sidebar-foreground">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-2">
@@ -67,42 +67,14 @@ export function Footer() {
               </li>
             </ul>
           </div>
-
-          {/* Social Links */}
-          <div>
-            <h4 className="font-semibold text-lg mb-4">Follow Us</h4>
-            <div className="flex gap-3">
-              <a
-                href="#"
-                className="w-10 h-10 rounded-lg bg-sidebar-accent flex items-center justify-center hover:bg-primary transition-colors"
-              >
-                <Facebook className="w-5 h-5" />
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 rounded-lg bg-sidebar-accent flex items-center justify-center hover:bg-primary transition-colors"
-              >
-                <Twitter className="w-5 h-5" />
-              </a>
-              <a
-                href="#"
-                className="w-10 h-10 rounded-lg bg-sidebar-accent flex items-center justify-center hover:bg-primary transition-colors"
-              >
-                <Instagram className="w-5 h-5" />
-              </a>
-            </div>
-          </div>
         </div>
 
-        {/* Bottom Bar with Copyright, Developer Credit, and Legal Links */}
+        {/* Bottom Bar */}
         <div className="border-t border-sidebar-border mt-8 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            {/* Copyright - Left */}
             <div className="text-sidebar-foreground/60 text-sm">
               <p>&copy; {new Date().getFullYear()} THE TEAM: Diverse but United. All rights reserved.</p>
             </div>
-
-            {/* Developer Credit - Center on mobile, left on desktop */}
             <div className="text-sidebar-foreground/60 text-sm">
               Developed by{' '}
               <a
@@ -114,19 +86,11 @@ export function Footer() {
                 SkySoft solution LTD
               </a>
             </div>
-
-            {/* Privacy & Terms - Right */}
             <div className="flex gap-4 text-sm">
-              <Link
-                to="/privacy"
-                className="text-sidebar-foreground/60 hover:text-primary transition-colors"
-              >
+              <Link to="/privacy" className="text-sidebar-foreground/60 hover:text-primary transition-colors">
                 Privacy Policy
               </Link>
-              <Link
-                to="/terms"
-                className="text-sidebar-foreground/60 hover:text-primary transition-colors"
-              >
+              <Link to="/terms" className="text-sidebar-foreground/60 hover:text-primary transition-colors">
                 Terms of Service
               </Link>
             </div>
