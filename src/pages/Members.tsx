@@ -185,31 +185,14 @@
      (member.phone && member.phone.includes(searchTerm))
    );
  
-   const getStatusBadge = (status?: string) => {
-     switch (status) {
-       case 'paid':
-         return (
-           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-             <CheckCircle className="w-3 h-3" />
-             Paid
-           </span>
-         );
-       case 'overdue':
-         return (
-           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
-             <AlertTriangle className="w-3 h-3" />
-             Overdue
-           </span>
-         );
-       default:
-         return (
-           <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-             <Clock className="w-3 h-3" />
-             Pending
-           </span>
-         );
-     }
-   };
+  const getStatusBadge = () => {
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
+        <CheckCircle className="w-3 h-3" />
+        Active
+      </span>
+    );
+  };
  
    const getInitials = (name: string) => {
      return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -236,15 +219,9 @@
                  <Users className="w-8 h-8 text-primary" />
                  Members Directory
                </h1>
-               <p className="text-muted-foreground mt-1">
-                 {members.length} active members ({adminCount} administrators)
-                 {isAdmin && (
-                   <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                     <Shield className="w-3 h-3" />
-                     Admin
-                   </span>
-                 )}
-               </p>
+                <p className="text-muted-foreground mt-1">
+                  {members.length} active members
+                </p>
              </div>
              <div className="flex flex-wrap gap-2">
                <Button onClick={exportMembersToCSV} variant="outline" size="sm" className="gap-2">
@@ -259,22 +236,6 @@
            </div>
          </div>
  
-         {isAdmin && (
-           <div className="mb-6 p-4 border rounded-lg bg-gradient-to-r from-purple-50 to-indigo-50">
-             <div className="flex items-center justify-between">
-               <div className="flex items-center gap-3">
-                 <Crown className="w-5 h-5 text-purple-600" />
-                 <div>
-                   <h3 className="font-semibold text-foreground">Administrator Panel</h3>
-                   <p className="text-sm text-muted-foreground">You have full access to manage members and payments</p>
-                 </div>
-               </div>
-               <div className="text-sm text-muted-foreground">
-                 {adminCount} of {members.length} members are administrators
-               </div>
-             </div>
-           </div>
-         )}
  
          {members.length === 0 && (
            <div className="mb-6 p-6 border rounded-lg bg-gradient-to-r from-amber-50 to-orange-50">
@@ -327,26 +288,15 @@
                          <div className="relative w-24 h-24 mx-auto mb-4">
                            <Avatar className="w-full h-full border-2 border-primary/20">
                              <AvatarImage src={imageUrl || undefined} alt={member.full_name} className="object-cover" />
-                             <AvatarFallback className={`text-xl ${member.is_admin ? 'bg-gradient-to-br from-amber-500 to-orange-500' : 'bg-gradient-to-br from-primary to-primary/80'} text-primary-foreground`}>
+                             <AvatarFallback className="text-xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
                                {getInitials(member.full_name)}
                              </AvatarFallback>
                            </Avatar>
-                           {member.is_admin && (
-                             <div className="absolute -top-1 -right-1">
-                               <Crown className="w-6 h-6 text-amber-500 fill-amber-200" />
-                             </div>
-                           )}
                          </div>
-                         <h3 className="font-semibold text-lg text-foreground mb-1">
-                           {member.full_name}
-                           {member.is_admin && (
-                             <span className="ml-2 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                               <Crown className="w-3 h-3" />
-                               Admin
-                             </span>
-                           )}
-                         </h3>
-                         <div className="mt-2 mb-3">{getStatusBadge(member.payment_status)}</div>
+                          <h3 className="font-semibold text-lg text-foreground mb-1">
+                            {member.full_name}
+                          </h3>
+                         <div className="mt-2 mb-3">{getStatusBadge()}</div>
                        </div>
                        <div className="mt-4 space-y-3 text-sm">
                          <div className="flex items-center gap-2 text-muted-foreground p-2 bg-muted/50 rounded">
@@ -380,26 +330,15 @@
                          <div className="relative">
                            <Avatar className="w-12 h-12 border border-primary/20">
                              <AvatarImage src={imageUrl || undefined} alt={member.full_name} className="object-cover" />
-                             <AvatarFallback className={`${member.is_admin ? 'bg-gradient-to-br from-amber-500 to-orange-500' : 'bg-gradient-to-br from-primary to-primary/80'} text-primary-foreground`}>
+                             <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground">
                                {getInitials(member.full_name)}
                              </AvatarFallback>
                            </Avatar>
-                           {member.is_admin && (
-                             <div className="absolute -top-1 -right-1">
-                               <Crown className="w-4 h-4 text-amber-500 fill-amber-200" />
-                             </div>
-                           )}
                          </div>
                          <div className="flex-1 min-w-0">
                            <div className="flex items-center gap-2 mb-1">
-                             <h3 className="font-semibold text-foreground truncate">{member.full_name}</h3>
-                             {member.is_admin && (
-                               <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">
-                                 <Crown className="w-3 h-3" />
-                                 Admin
-                               </span>
-                             )}
-                             {getStatusBadge(member.payment_status)}
+                              <h3 className="font-semibold text-foreground truncate">{member.full_name}</h3>
+                              {getStatusBadge()}
                            </div>
                            <p className="text-sm text-muted-foreground truncate flex items-center gap-2">
                              <Mail className="w-3 h-3" />

@@ -144,7 +144,8 @@ const constitutionSections = [
     icon: Calendar,
     content: `
       <ul>
-        <li>Group meetings will be held on the <strong>11th of every month</strong></li>
+        <li>Group meetings will be held <strong>online on the 11th of every month</strong></li>
+        <li>The annual general meeting (AGM) will also be conducted <strong>online</strong>, held in December each year</li>
         <li>Failure to attend a scheduled meeting without valid reason will attract a fine of <strong>KSh 50</strong>, which will be deducted from the member's shares. If this continues, further fines will accumulate daily.</li>
       </ul>
     `,
@@ -157,7 +158,7 @@ const constitutionSections = [
       <p>The group shall generate income through:</p>
       <ul>
         <li>KSh 200 registration fee</li>
-        <li>KSh 500 (minimum) monthly savings</li>
+        <li>KSh 500 monthly savings</li>
         <li>Grants/Loans from government and NGOs</li>
         <li>Fundraising and donations from well-wishers</li>
         <li>Profit from the group's I.G.As</li>
@@ -191,7 +192,7 @@ const constitutionSections = [
     title: 'Books of Record and Reports',
     icon: FileText,
     content: `
-      <p>The group will maintain a register, minutes book, and other records as needed. All records shall be accessible to members upon reasonable notice. An annual report will be prepared and presented at the AGM held in December each year.</p>
+      <p>The group will maintain a register, minutes book, and other records as needed. All records shall be accessible to members upon reasonable notice. An annual report will be prepared and presented at the online AGM held in December each year.</p>
     `,
   },
   {

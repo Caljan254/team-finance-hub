@@ -26,10 +26,10 @@ const leaders = [
     icon: BookOpen,
   },
   {
-    name: 'Munyoki Mutua',
+    name: 'Betty Katungi',
     role: 'Vice Secretary',
     description: 'Assumes the secretary\'s role in their absence (except bank signatory duties).',
-    image: '/uploads/munyoki-mutua.jpg',
+    image: '',
     icon: BookOpen,
   },
   {

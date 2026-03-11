@@ -82,37 +82,99 @@ export default function Dashboard() {
   const fetchPaymentData = async () => {
     if (!user) return;
 
-    const { data: payments } = await supabase
+    // Fetch ALL payments to calculate total contributed since joining
+    const { data: allPayments } = await supabase
       .from('payments')
       .select('*')
       .eq('user_id', user.id)
       .order('year', { ascending: false })
-      .order('month', { ascending: false })
-      .limit(5);
+      .order('month', { ascending: false });
 
-    if (payments) {
-      const totalPaid = payments
-        .filter(p => p.status === 'paid')
-        .reduce((sum, p) => sum + Number(p.amount), 0);
-      
-      const totalPenalties = payments.reduce((sum, p) => sum + Number(p.penalty_amount || 0), 0);
-      
-      const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
-      const currentYear = new Date().getFullYear();
-      const currentPayment = payments.find(p => p.month === currentMonth && p.year === currentYear);
-      
-      const outstanding = calculateOutstanding(
-        payments.map(p => ({ month: p.month, year: p.year, status: p.status }))
-      );
-      setBreakdown(outstanding);
-      
-      setPaymentSummary({
-        totalPaid,
-        totalPenalties: outstanding.totalPenalties,
-        currentMonthStatus: (currentPayment?.status as 'paid' | 'pending' | 'overdue') || 'pending',
-        recentPayments: payments as any,
-      });
+    // Also fetch contribution records marked as paid for this user
+    const { data: contributionRecords } = await supabase
+      .from('contribution_records')
+      .select('*')
+      .eq('status', 'paid')
+      .order('year', { ascending: false })
+      .order('month', { ascending: false });
+
+    const payments = allPayments || [];
+    const records = contributionRecords || [];
+
+    // Get profile name to match contribution records
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('user_id', user.id)
+      .single();
+
+    const memberName = profileData?.full_name || '';
+
+    // Build paid months from both payments table and contribution_records
+    const paidFromPayments = payments
+      .filter(p => p.status === 'paid')
+      .map(p => ({ month: p.month, year: p.year, status: p.status }));
+    
+    const paidFromRecords = records
+      .filter(r => r.member_name === memberName && r.status === 'paid')
+      .map(r => ({ month: r.month, year: r.year, status: r.status }));
+
+    // Merge paid months (deduplicate)
+    const paidSet = new Set(paidFromPayments.map(p => `${p.month}-${p.year}`));
+    const allPaidMonths = [...paidFromPayments];
+    for (const r of paidFromRecords) {
+      const key = `${r.month}-${r.year}`;
+      if (!paidSet.has(key)) {
+        allPaidMonths.push(r);
+        paidSet.add(key);
+      }
     }
+
+    // Total contributed = count of paid months * 500
+    const totalPaid = allPaidMonths.length * 500;
+    
+    const totalPenalties = payments.reduce((sum, p) => sum + Number(p.penalty_amount || 0), 0);
+    
+    const currentMonth = new Date().toLocaleString('en-US', { month: 'long' });
+    const currentYear = new Date().getFullYear();
+    const currentPaidFromRecords = paidFromRecords.some(r => r.month === currentMonth && r.year === currentYear);
+    const currentPayment = payments.find(p => p.month === currentMonth && p.year === currentYear);
+    const currentMonthPaid = currentPaidFromRecords || currentPayment?.status === 'paid';
+    
+    const outstanding = calculateOutstanding(allPaidMonths);
+    setBreakdown(outstanding);
+
+    // Build recent payments list from contribution records for this member
+    const recentFromRecords = records
+      .filter(r => r.member_name === memberName)
+      .slice(0, 5)
+      .map(r => ({
+        id: r.id,
+        month: r.month,
+        year: r.year,
+        amount: Number(r.amount),
+        status: r.status,
+        paid_date: r.paid_date,
+      }));
+
+    // Fall back to payments table if no contribution records
+    const recentPayments = recentFromRecords.length > 0 
+      ? recentFromRecords 
+      : payments.slice(0, 5).map(p => ({
+          id: p.id,
+          month: p.month,
+          year: p.year,
+          amount: Number(p.amount),
+          status: p.status,
+          paid_date: p.paid_date,
+        }));
+    
+    setPaymentSummary({
+      totalPaid,
+      totalPenalties: outstanding.totalPenalties,
+      currentMonthStatus: currentMonthPaid ? 'paid' : (currentPayment?.status as 'paid' | 'pending' | 'overdue') || 'pending',
+      recentPayments,
+    });
   };
 
   const getCurrentMonth = () => {
@@ -322,7 +384,7 @@ export default function Dashboard() {
               <CardContent className="space-y-4">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Monthly Amount</span>
-                  <span className="font-medium">KSh 600</span>
+                  <span className="font-medium">KSh 500</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Deadline</span>

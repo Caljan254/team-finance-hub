@@ -103,7 +103,7 @@ export function MpesaPaymentModal({ isOpen, onClose, amount, month, onSuccess }:
       // Save pending payment with checkout request ID as temporary transaction_id
       await supabase.from('payments').insert({
         user_id: user.id,
-        amount: 600,
+        amount: 500,
         month: currentMonth,
         year: currentYear,
         status: 'pending',
