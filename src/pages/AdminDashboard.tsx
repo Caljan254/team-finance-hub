@@ -1039,8 +1039,6 @@ export default function AdminDashboard() {
   );
 }
 
-// Penalties sub-component
-function PenaltiesTab({ 
   selectedMonth, selectedYear, allMembers, paidMembers, onCreatePenalty, penaltyRecords, onMarkPaid, onMarkUnpaid, savingPenalty 
 }: { 
   selectedMonth: string; selectedYear: string; allMembers: string[]; paidMembers: string[];
