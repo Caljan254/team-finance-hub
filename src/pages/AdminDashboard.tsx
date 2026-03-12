@@ -287,12 +287,11 @@ export default function AdminDashboard() {
       .order('month', { ascending: false });
 
     if (data) {
-      // Map user_ids to member names
       const userIds = [...new Set(data.map(p => p.user_id))];
       const { data: profilesData } = await supabase
         .from('profiles')
         .select('user_id, full_name')
-        .in('user_id', userIds);
+        .in('user_id', userIds.length > 0 ? userIds : ['none']);
 
       const nameMap = new Map((profilesData || []).map(p => [p.user_id, p.full_name]));
       
@@ -308,6 +307,90 @@ export default function AdminDashboard() {
     setLoadingPenalties(false);
   };
 
+  const calculatePenaltiesFromRecords = async () => {
+    // Fetch all contribution records
+    const { data: allRecs } = await supabase
+      .from('contribution_records')
+      .select('*');
+    
+    // Fetch existing penalty records
+    const { data: existingPenalties } = await supabase
+      .from('penalties')
+      .select('*');
+
+    // Get all profiles for name mapping
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('user_id, full_name');
+
+    const nameMap = new Map((profilesData || []).map(p => [p.user_id, p.full_name]));
+    const userIdMap = new Map((profilesData || []).map(p => [p.full_name, p.user_id]));
+
+    const records = allRecs || [];
+    const penalties = existingPenalties || [];
+    const memberNames = [...new Set(records.map(r => r.member_name))].sort();
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthIndex = now.getMonth();
+
+    const calculated: Array<{memberName: string; month: string; year: number; daysLate: number; penaltyAmount: number; existingRecord?: PenaltyRecord}> = [];
+
+    for (const memberName of memberNames) {
+      const memberRecs = records.filter(r => r.member_name === memberName && r.status === 'paid');
+      const paidSet = new Set(memberRecs.map(r => `${r.month}-${r.year}`));
+      const userId = userIdMap.get(memberName);
+
+      // Check all months from Jan 2025 to current
+      let year = 2025;
+      let monthIdx = 0;
+
+      while (year < currentYear || (year === currentYear && monthIdx <= currentMonthIndex)) {
+        const monthName = MONTHS[monthIdx];
+        const key = `${monthName}-${year}`;
+
+        if (!paidSet.has(key)) {
+          // Deadline is 10th of NEXT month
+          let dlMonth = monthIdx + 1;
+          let dlYear = year;
+          if (dlMonth > 11) { dlMonth = 0; dlYear++; }
+          const deadlineDate = new Date(dlYear, dlMonth, 10);
+
+          if (now > deadlineDate) {
+            const daysLate = Math.floor((now.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24));
+            
+            // Find existing penalty record
+            const existingPenalty = userId ? penalties.find(p => p.user_id === userId && p.month === monthName && p.year === year) : undefined;
+            
+            // Skip if penalty is already marked as paid
+            if (existingPenalty?.paid) continue;
+
+            calculated.push({
+              memberName,
+              month: monthName,
+              year,
+              daysLate,
+              penaltyAmount: daysLate * 10,
+              existingRecord: existingPenalty ? {
+                ...existingPenalty,
+                days_overdue: existingPenalty.days_overdue || 0,
+                daily_penalty: existingPenalty.daily_penalty || 10,
+                total_penalty: existingPenalty.total_penalty || 0,
+                paid: existingPenalty.paid || false,
+                member_name: memberName,
+              } : undefined,
+            });
+          }
+        }
+
+        monthIdx++;
+        if (monthIdx > 11) { monthIdx = 0; year++; }
+      }
+    }
+
+    setCalculatedPenalties(calculated);
+  };
+
   const markPenaltyPaid = async (penaltyId: string) => {
     setSavingPenalty(penaltyId);
     const { error } = await supabase
@@ -320,6 +403,7 @@ export default function AdminDashboard() {
     } else {
       toast.success('Penalty marked as paid');
       fetchPenalties();
+      calculatePenaltiesFromRecords();
     }
     setSavingPenalty(null);
   };
@@ -336,12 +420,12 @@ export default function AdminDashboard() {
     } else {
       toast.success('Penalty marked as unpaid');
       fetchPenalties();
+      calculatePenaltiesFromRecords();
     }
     setSavingPenalty(null);
   };
 
   const createPenaltyRecord = async (memberName: string, month: string, year: number, daysOverdue: number) => {
-    // Find user_id from profiles
     const { data: profileData } = await supabase
       .from('profiles')
       .select('user_id')
@@ -353,7 +437,6 @@ export default function AdminDashboard() {
       return;
     }
 
-    // Check if penalty already exists
     const { data: existing } = await supabase
       .from('penalties')
       .select('id')
@@ -363,7 +446,6 @@ export default function AdminDashboard() {
       .single();
 
     if (existing) {
-      // Update existing
       await supabase.from('penalties').update({
         days_overdue: daysOverdue,
         total_penalty: daysOverdue * 10,
@@ -382,6 +464,52 @@ export default function AdminDashboard() {
 
     toast.success(`Penalty recorded for ${memberName}`);
     fetchPenalties();
+    calculatePenaltiesFromRecords();
+  };
+
+  const recordAndMarkPaid = async (memberName: string, month: string, year: number, daysOverdue: number) => {
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('full_name', memberName)
+      .single();
+
+    if (!profileData) {
+      toast.error(`No profile found for ${memberName}`);
+      return;
+    }
+
+    const { data: existing } = await supabase
+      .from('penalties')
+      .select('id')
+      .eq('user_id', profileData.user_id)
+      .eq('month', month)
+      .eq('year', year)
+      .single();
+
+    if (existing) {
+      await supabase.from('penalties').update({
+        days_overdue: daysOverdue,
+        total_penalty: daysOverdue * 10,
+        paid: true,
+        paid_date: new Date().toISOString(),
+      }).eq('id', existing.id);
+    } else {
+      await supabase.from('penalties').insert({
+        user_id: profileData.user_id,
+        month,
+        year,
+        days_overdue: daysOverdue,
+        daily_penalty: 10,
+        total_penalty: daysOverdue * 10,
+        paid: true,
+        paid_date: new Date().toISOString(),
+      });
+    }
+
+    toast.success(`Penalty recorded & marked paid for ${memberName}`);
+    fetchPenalties();
+    calculatePenaltiesFromRecords();
   };
 
   // --- NOTIFICATIONS ---
