@@ -233,7 +233,10 @@ export default function Payments() {
                       >
                         <div>
                           <p className="font-medium">{item.month} {item.year}</p>
-                          <p className="text-sm text-muted-foreground">
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                            Period: 10th {item.month} to 10th {months[(months.indexOf(item.month) + 1) % 12]}
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-1">
                             {item.penaltyDays > 0 
                               ? `${item.penaltyDays} day${item.penaltyDays > 1 ? 's' : ''} overdue`
                               : 'Not yet due for penalty'

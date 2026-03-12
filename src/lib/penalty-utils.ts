@@ -43,16 +43,39 @@ export interface PaymentBreakdown {
  */
 export function calculateOutstanding(
   paidMonths: Array<{ month: string; year: number; status: string }>,
-  paidPenaltyMonths?: Array<{ month: string; year: number }>
+  paidPenaltyMonths?: Array<{ month: string; year: number }>,
+  joinMonth?: string,
+  joinYear?: number
 ): PaymentBreakdown {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonthIndex = now.getMonth();
-  const currentDay = now.getDate();
 
-  // Start from January 2025 (group start)
-  const startYear = 2025;
-  const startMonthIndex = 0; // January
+  // Find the earliest record to determine when this member joined,
+  // unless explicitly provided via joinMonth/joinYear
+  let startYear = joinYear || 2025;
+  let startMonthIndex = joinMonth ? MONTHS.indexOf(joinMonth) : 0;
+
+  if (!joinMonth && !joinYear) {
+    if (paidMonths.length === 0) {
+      // If no records and no join date provided, they haven't "started" yet
+      return {
+        unpaidMonths: [],
+        totalContribution: 0,
+        totalPenalties: 0,
+        grandTotal: 0,
+      };
+    }
+    
+    // Sort paid months to find the earliest one
+    const sortedRecords = [...paidMonths].sort((a, b) => {
+      if (a.year !== b.year) return a.year - b.year;
+      return MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month);
+    });
+    
+    startYear = sortedRecords[0].year;
+    startMonthIndex = MONTHS.indexOf(sortedRecords[0].month);
+  }
 
   const paidSet = new Set(
     paidMonths
@@ -86,16 +109,24 @@ export function calculateOutstanding(
 
       // Only calculate penalty if penalty hasn't been marked as paid
       if (!paidPenaltySet.has(key)) {
-        const deadlineDate = new Date(deadlineYear, deadlineMonth, DEADLINE_DAY);
+        // Apply waiver: Penalties only start from the February 2026 contribution onwards
+        // February 2026 contribution period is Feb 10 - Mar 10. Deadline is Mar 10.
+        // User stated: "those did not contribute for the last months since the team started there was waiver done on the penalties"
+        // and "penalties are suppossed to count to those who have not contributed for the month of the february this year"
+        const isBeforeFebruary2026 = year < 2026 || (year === 2026 && monthIndex < 1);
+        
+        if (!isBeforeFebruary2026) {
+          const deadlineDate = new Date(deadlineYear, deadlineMonth, DEADLINE_DAY);
 
-        if (now > deadlineDate) {
-          // Past the deadline - count days since deadline
-          const daysSinceDeadline = Math.floor(
-            (now.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24)
-          );
-          penaltyDays = Math.max(0, daysSinceDeadline);
+          if (now > deadlineDate) {
+            // Past the deadline - count days since deadline
+            const daysSinceDeadline = Math.floor(
+              (now.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24)
+            );
+            penaltyDays = Math.max(0, daysSinceDeadline);
+          }
         }
-        // If we haven't passed the deadline yet, no penalty
+        // If we haven't passed the deadline yet, or it's before Feb 2026, no penalty
       }
 
       const penaltyAmount = penaltyDays * DAILY_PENALTY;

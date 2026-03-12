@@ -73,8 +73,29 @@ export default function AdminDashboard() {
   // Payment state
   const [records, setRecords] = useState<ContributionRecord[]>([]);
   const [allMembers, setAllMembers] = useState<string[]>([]);
-  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear().toString());
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toLocaleString('en-US', { month: 'long' }));
+  // Calculate the currently active contribution month (Period: 10th to 10th)
+  // If today is before the 10th, the active contribution month is the previous month
+  const getInitialPeriod = () => {
+    const now = new Date();
+    let monthIdx = now.getMonth();
+    let year = now.getFullYear();
+    
+    if (now.getDate() < 10) {
+      monthIdx -= 1;
+      if (monthIdx < 0) {
+        monthIdx = 11;
+        year -= 1;
+      }
+    }
+    return { 
+      month: MONTHS[monthIdx], 
+      year: year.toString() 
+    };
+  };
+
+  const initialPeriod = getInitialPeriod();
+  const [selectedYear, setSelectedYear] = useState(initialPeriod.year);
+  const [selectedMonth, setSelectedMonth] = useState(initialPeriod.month);
   const [newMemberName, setNewMemberName] = useState('');
   const [saving, setSaving] = useState<string | null>(null);
 
@@ -126,16 +147,23 @@ export default function AdminDashboard() {
 
   // --- PAYMENTS ---
   const fetchPaymentData = async () => {
+    // 1. Get all profiles (primary source for members)
+    const { data: profileNamesData } = await supabase
+      .from('profiles')
+      .select('full_name');
+    const profileNames = (profileNamesData || []).map(p => p.full_name);
+
+    // 2. Get any other names that might be in contribution records but not in profiles
     const { data: allRecs } = await supabase
       .from('contribution_records')
-      .select('member_name')
-      .order('member_name');
-    
-    if (allRecs) {
-      const members = [...new Set(allRecs.map(r => r.member_name))].sort();
-      setAllMembers(members);
-    }
+      .select('member_name');
+    const recordNames = (allRecs || []).map(r => r.member_name);
 
+    // Combine and sort
+    const members = [...new Set([...profileNames, ...recordNames])].sort();
+    setAllMembers(members);
+
+    // 3. Get records for selected month/year
     const { data } = await supabase
       .from('contribution_records')
       .select('*')
@@ -245,21 +273,43 @@ export default function AdminDashboard() {
   const fetchMemberOverview = async () => {
     setLoadingSummaries(true);
     
+    // Fetch all contribution records
     const { data: allRecs } = await supabase
       .from('contribution_records')
-      .select('*')
-      .order('member_name');
+      .select('*');
     
-    if (allRecs) {
-      const memberNames = [...new Set(allRecs.map(r => r.member_name))].sort();
+    // Fetch all profiles for member list
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('user_id, full_name');
+    
+    // Fetch all paid penalties to exclude from total owed
+    const { data: paidPenalties } = await supabase
+      .from('penalties')
+      .select('user_id, month, year')
+      .eq('paid', true);
+
+    if (allRecs && profilesData) {
+      const profileNames = profilesData.map(p => p.full_name);
+      const recordNames = allRecs.map(r => r.member_name);
+      const allNames = [...new Set([...profileNames, ...recordNames])].sort();
       
-      const summaries: MemberFinancialSummary[] = memberNames.map(name => {
+      const summaries: MemberFinancialSummary[] = allNames.map(name => {
         const memberRecs = allRecs.filter(r => r.member_name === name);
         const paidRecs = memberRecs.filter(r => r.status === 'paid');
-        const totalPaid = paidRecs.length * 500;
         
+        // Sum actual amounts from records (like in record page)
+        const totalPaid = paidRecs.reduce((sum, r) => sum + Number(r.amount), 0);
+        
+        // Find user_id if available to find their paid penalties
+        const profile = profilesData.find(p => p.full_name === name);
+        const memberPaidPenalties = profile 
+          ? (paidPenalties || []).filter(p => p.user_id === profile.user_id).map(p => ({ month: p.month, year: p.year }))
+          : [];
+
         const breakdown = calculateOutstanding(
-          paidRecs.map(r => ({ month: r.month, year: r.year, status: r.status }))
+          paidRecs.map(r => ({ month: r.month, year: r.year, status: r.status })),
+          memberPaidPenalties
         );
         
         return {
@@ -328,7 +378,10 @@ export default function AdminDashboard() {
 
     const records = allRecs || [];
     const penalties = existingPenalties || [];
-    const memberNames = [...new Set(records.map(r => r.member_name))].sort();
+    
+    const profileNames = (profilesData || []).map(p => p.full_name);
+    const recordNames = records.map(r => r.member_name);
+    const memberNames = [...new Set([...profileNames, ...recordNames])].sort();
     
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -341,9 +394,23 @@ export default function AdminDashboard() {
       const paidSet = new Set(memberRecs.map(r => `${r.month}-${r.year}`));
       const userId = userIdMap.get(memberName);
 
-      // Check all months from Jan 2025 to current
+      // Determine when this member joined based on their first contribution
       let year = 2025;
       let monthIdx = 0;
+
+      if (memberRecs.length > 0) {
+        const sortedRecs = [...memberRecs].sort((a, b) => {
+          if (a.year !== b.year) return a.year - b.year;
+          return MONTHS.indexOf(a.month) - MONTHS.indexOf(b.month);
+        });
+        year = sortedRecs[0].year;
+        monthIdx = MONTHS.indexOf(sortedRecs[0].month);
+      } else {
+        // If no records at all, we could skip or use profile join date
+        // User said: "when you see the first contribution of the member means to be the first time they joined"
+        // So if no contribution, they haven't "joined" for financial purposes yet?
+        continue; 
+      }
 
       while (year < currentYear || (year === currentYear && monthIdx <= currentMonthIndex)) {
         const monthName = MONTHS[monthIdx];
@@ -357,6 +424,12 @@ export default function AdminDashboard() {
           const deadlineDate = new Date(dlYear, dlMonth, 10);
 
           if (now > deadlineDate) {
+            // Apply waiver: Only count penalties from February 2026 onwards
+            // February 2026 contribution period deadline is March 10, 2026
+            const isBeforeFebruary2026 = year < 2026 || (year === 2026 && monthIdx < 1);
+            
+            if (isBeforeFebruary2026) continue;
+
             const daysLate = Math.floor((now.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24));
             
             // Find existing penalty record
@@ -594,6 +667,24 @@ export default function AdminDashboard() {
   const totalPenaltiesCollected = penaltyRecords.filter(p => p.paid).reduce((s, p) => s + Number(p.total_penalty), 0);
   const totalPenaltiesOutstanding = penaltyRecords.filter(p => !p.paid).reduce((s, p) => s + Number(p.total_penalty), 0);
 
+  const getMonthPeriodText = (monthName: string, year: string) => {
+    const monthIdx = MONTHS.indexOf(monthName);
+    const y = parseInt(year);
+    if (monthIdx === -1) return '';
+    
+    // Period: 10th of current month to 10th of next month
+    const startDate = new Date(y, monthIdx, 10);
+    let endMonthIdx = monthIdx + 1;
+    let endYear = y;
+    if (endMonthIdx > 11) {
+      endMonthIdx = 0;
+      endYear++;
+    }
+    const endDate = new Date(endYear, endMonthIdx, 10);
+    
+    return `${startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} to ${endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -651,16 +742,23 @@ export default function AdminDashboard() {
               <Card>
                 <CardContent className="pt-6">
                   <p className="text-sm text-muted-foreground">Total Collected</p>
-                  <p className="text-2xl font-bold">KSh {(paidMembers.length * 500).toLocaleString()}</p>
+                  <p className="text-2xl font-bold">
+                    KSh {records.reduce((sum, r) => sum + Number(r.amount), 0).toLocaleString()}
+                  </p>
                 </CardContent>
               </Card>
             </div>
 
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-5 h-5" />
-                  {selectedMonth} {selectedYear} - Members
+                <CardTitle className="flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    <span>{selectedMonth} {selectedYear} - Members</span>
+                  </div>
+                  <span className="text-sm font-normal text-muted-foreground bg-muted px-3 py-1 rounded-full">
+                    Period: {getMonthPeriodText(selectedMonth, selectedYear)}
+                  </span>
                 </CardTitle>
               </CardHeader>
               <CardContent>
