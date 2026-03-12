@@ -958,7 +958,7 @@ export default function AdminDashboard() {
               <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin" /></div>
             ) : (
               <div className="space-y-4">
-                <div className="grid sm:grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                   <Card>
                     <CardContent className="pt-6">
                       <p className="text-sm text-muted-foreground">Total Penalties Collected</p>
@@ -994,23 +994,37 @@ export default function AdminDashboard() {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {penaltyRecords.map((penalty) => (
-                          <div key={penalty.id} className={`flex items-center justify-between p-3 rounded-lg border ${penalty.paid ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                            <div>
-                              <span className="font-medium">{penalty.member_name}</span>
-                              <p className="text-sm text-muted-foreground">{penalty.month} {penalty.year} — {penalty.days_overdue} days overdue</p>
-                              {penalty.paid && penalty.paid_date && (
-                                <p className="text-xs text-green-600">Paid on {new Date(penalty.paid_date).toLocaleDateString()}</p>
-                              )}
+                        {penaltyRecords.map((penalty) => {
+                          const isSaving = savingPenalty === penalty.id;
+                          return (
+                            <div key={penalty.id} className={`p-3 rounded-lg border ${penalty.paid ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <span className="font-medium block truncate">{penalty.member_name}</span>
+                                  <p className="text-sm text-muted-foreground">{penalty.month} {penalty.year} — {penalty.days_overdue} days overdue</p>
+                                  {penalty.paid && penalty.paid_date && (
+                                    <p className="text-xs text-green-600">Paid on {new Date(penalty.paid_date).toLocaleDateString()}</p>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-semibold whitespace-nowrap">KSh {Number(penalty.total_penalty).toLocaleString()}</span>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${penalty.paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                    {penalty.paid ? <><CheckCircle className="w-3 h-3" />Paid</> : <><AlertTriangle className="w-3 h-3" />Unpaid</>}
+                                  </span>
+                                  {penalty.paid ? (
+                                    <Button variant="outline" size="sm" onClick={() => markPenaltyUnpaid(penalty.id)} disabled={isSaving} className="text-red-600 border-red-300 hover:bg-red-100 whitespace-nowrap text-xs">
+                                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Undo'}
+                                    </Button>
+                                  ) : (
+                                    <Button variant="outline" size="sm" onClick={() => markPenaltyPaid(penalty.id)} disabled={isSaving} className="text-green-600 border-green-300 hover:bg-green-100 whitespace-nowrap text-xs">
+                                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-1" />Mark Paid</>}
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                              <span className="font-semibold">KSh {Number(penalty.total_penalty).toLocaleString()}</span>
-                              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${penalty.paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                {penalty.paid ? <><CheckCircle className="w-3 h-3" />Paid</> : <><AlertTriangle className="w-3 h-3" />Unpaid</>}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </CardContent>
