@@ -1039,7 +1039,6 @@ export default function AdminDashboard() {
   );
 }
 
-  selectedMonth, selectedYear, allMembers, paidMembers, onCreatePenalty, penaltyRecords, onMarkPaid, onMarkUnpaid, savingPenalty 
 }: { 
   selectedMonth: string; selectedYear: string; allMembers: string[]; paidMembers: string[];
   onCreatePenalty: (name: string, month: string, year: number, days: number) => void;
