@@ -614,8 +614,6 @@ export default function AdminDashboard() {
             <TabsTrigger value="notifications" className="gap-1 text-xs sm:text-sm"><Bell className="w-4 h-4" /><span className="hidden sm:inline">Notifications</span><span className="sm:hidden">Notif</span></TabsTrigger>
             <TabsTrigger value="penalties" className="gap-1 text-xs sm:text-sm"><AlertTriangle className="w-4 h-4" /><span className="hidden sm:inline">Penalties</span><span className="sm:hidden">Pen</span></TabsTrigger>
             <TabsTrigger value="penalties_collected" className="gap-1 text-xs sm:text-sm"><DollarSign className="w-4 h-4" /><span className="hidden sm:inline">Penalties Collected</span><span className="sm:hidden">Collected</span></TabsTrigger>
-            <TabsTrigger value="penalties" className="gap-2"><AlertTriangle className="w-4 h-4" />Penalties</TabsTrigger>
-            <TabsTrigger value="penalties_collected" className="gap-2"><DollarSign className="w-4 h-4" />Penalties Collected</TabsTrigger>
           </TabsList>
 
           {/* PAYMENTS TAB */}
