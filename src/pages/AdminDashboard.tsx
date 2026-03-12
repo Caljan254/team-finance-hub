@@ -112,7 +112,7 @@ export default function AdminDashboard() {
       if (activeTab === 'payments') fetchPaymentData();
       if (activeTab === 'members') fetchProfiles();
       if (activeTab === 'overview') fetchMemberOverview();
-      if (activeTab === 'penalties') { fetchPaymentData(); fetchPenalties(); }
+      if (activeTab === 'penalties') { fetchPaymentData(); fetchPenalties(); calculatePenaltiesFromRecords(); }
       if (activeTab === 'penalties_collected') fetchPenalties();
     }
   }, [isAdmin, activeTab, selectedYear, selectedMonth]);
