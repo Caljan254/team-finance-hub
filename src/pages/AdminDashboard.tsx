@@ -95,6 +95,7 @@ export default function AdminDashboard() {
 
   // Penalties state
   const [penaltyRecords, setPenaltyRecords] = useState<PenaltyRecord[]>([]);
+  const [calculatedPenalties, setCalculatedPenalties] = useState<Array<{memberName: string; month: string; year: number; daysLate: number; penaltyAmount: number; existingRecord?: PenaltyRecord}>>([]);
   const [loadingPenalties, setLoadingPenalties] = useState(false);
   const [savingPenalty, setSavingPenalty] = useState<string | null>(null);
 
