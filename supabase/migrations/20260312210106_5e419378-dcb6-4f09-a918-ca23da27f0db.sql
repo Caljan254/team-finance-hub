@@ -1,0 +1,1 @@
+UPDATE public.contribution_records SET amount = 500 WHERE amount = 600;

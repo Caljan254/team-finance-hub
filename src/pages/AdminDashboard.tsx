@@ -95,6 +95,7 @@ export default function AdminDashboard() {
 
   // Penalties state
   const [penaltyRecords, setPenaltyRecords] = useState<PenaltyRecord[]>([]);
+  const [calculatedPenalties, setCalculatedPenalties] = useState<Array<{memberName: string; month: string; year: number; daysLate: number; penaltyAmount: number; existingRecord?: PenaltyRecord}>>([]);
   const [loadingPenalties, setLoadingPenalties] = useState(false);
   const [savingPenalty, setSavingPenalty] = useState<string | null>(null);
 
@@ -111,7 +112,7 @@ export default function AdminDashboard() {
       if (activeTab === 'payments') fetchPaymentData();
       if (activeTab === 'members') fetchProfiles();
       if (activeTab === 'overview') fetchMemberOverview();
-      if (activeTab === 'penalties') { fetchPaymentData(); fetchPenalties(); }
+      if (activeTab === 'penalties') { fetchPaymentData(); fetchPenalties(); calculatePenaltiesFromRecords(); }
       if (activeTab === 'penalties_collected') fetchPenalties();
     }
   }, [isAdmin, activeTab, selectedYear, selectedMonth]);
@@ -286,12 +287,11 @@ export default function AdminDashboard() {
       .order('month', { ascending: false });
 
     if (data) {
-      // Map user_ids to member names
       const userIds = [...new Set(data.map(p => p.user_id))];
       const { data: profilesData } = await supabase
         .from('profiles')
         .select('user_id, full_name')
-        .in('user_id', userIds);
+        .in('user_id', userIds.length > 0 ? userIds : ['none']);
 
       const nameMap = new Map((profilesData || []).map(p => [p.user_id, p.full_name]));
       
@@ -307,6 +307,90 @@ export default function AdminDashboard() {
     setLoadingPenalties(false);
   };
 
+  const calculatePenaltiesFromRecords = async () => {
+    // Fetch all contribution records
+    const { data: allRecs } = await supabase
+      .from('contribution_records')
+      .select('*');
+    
+    // Fetch existing penalty records
+    const { data: existingPenalties } = await supabase
+      .from('penalties')
+      .select('*');
+
+    // Get all profiles for name mapping
+    const { data: profilesData } = await supabase
+      .from('profiles')
+      .select('user_id, full_name');
+
+    const nameMap = new Map((profilesData || []).map(p => [p.user_id, p.full_name]));
+    const userIdMap = new Map((profilesData || []).map(p => [p.full_name, p.user_id]));
+
+    const records = allRecs || [];
+    const penalties = existingPenalties || [];
+    const memberNames = [...new Set(records.map(r => r.member_name))].sort();
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonthIndex = now.getMonth();
+
+    const calculated: Array<{memberName: string; month: string; year: number; daysLate: number; penaltyAmount: number; existingRecord?: PenaltyRecord}> = [];
+
+    for (const memberName of memberNames) {
+      const memberRecs = records.filter(r => r.member_name === memberName && r.status === 'paid');
+      const paidSet = new Set(memberRecs.map(r => `${r.month}-${r.year}`));
+      const userId = userIdMap.get(memberName);
+
+      // Check all months from Jan 2025 to current
+      let year = 2025;
+      let monthIdx = 0;
+
+      while (year < currentYear || (year === currentYear && monthIdx <= currentMonthIndex)) {
+        const monthName = MONTHS[monthIdx];
+        const key = `${monthName}-${year}`;
+
+        if (!paidSet.has(key)) {
+          // Deadline is 10th of NEXT month
+          let dlMonth = monthIdx + 1;
+          let dlYear = year;
+          if (dlMonth > 11) { dlMonth = 0; dlYear++; }
+          const deadlineDate = new Date(dlYear, dlMonth, 10);
+
+          if (now > deadlineDate) {
+            const daysLate = Math.floor((now.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24));
+            
+            // Find existing penalty record
+            const existingPenalty = userId ? penalties.find(p => p.user_id === userId && p.month === monthName && p.year === year) : undefined;
+            
+            // Skip if penalty is already marked as paid
+            if (existingPenalty?.paid) continue;
+
+            calculated.push({
+              memberName,
+              month: monthName,
+              year,
+              daysLate,
+              penaltyAmount: daysLate * 10,
+              existingRecord: existingPenalty ? {
+                ...existingPenalty,
+                days_overdue: existingPenalty.days_overdue || 0,
+                daily_penalty: existingPenalty.daily_penalty || 10,
+                total_penalty: existingPenalty.total_penalty || 0,
+                paid: existingPenalty.paid || false,
+                member_name: memberName,
+              } : undefined,
+            });
+          }
+        }
+
+        monthIdx++;
+        if (monthIdx > 11) { monthIdx = 0; year++; }
+      }
+    }
+
+    setCalculatedPenalties(calculated);
+  };
+
   const markPenaltyPaid = async (penaltyId: string) => {
     setSavingPenalty(penaltyId);
     const { error } = await supabase
@@ -319,6 +403,7 @@ export default function AdminDashboard() {
     } else {
       toast.success('Penalty marked as paid');
       fetchPenalties();
+      calculatePenaltiesFromRecords();
     }
     setSavingPenalty(null);
   };
@@ -335,12 +420,12 @@ export default function AdminDashboard() {
     } else {
       toast.success('Penalty marked as unpaid');
       fetchPenalties();
+      calculatePenaltiesFromRecords();
     }
     setSavingPenalty(null);
   };
 
   const createPenaltyRecord = async (memberName: string, month: string, year: number, daysOverdue: number) => {
-    // Find user_id from profiles
     const { data: profileData } = await supabase
       .from('profiles')
       .select('user_id')
@@ -352,7 +437,6 @@ export default function AdminDashboard() {
       return;
     }
 
-    // Check if penalty already exists
     const { data: existing } = await supabase
       .from('penalties')
       .select('id')
@@ -362,7 +446,6 @@ export default function AdminDashboard() {
       .single();
 
     if (existing) {
-      // Update existing
       await supabase.from('penalties').update({
         days_overdue: daysOverdue,
         total_penalty: daysOverdue * 10,
@@ -381,6 +464,52 @@ export default function AdminDashboard() {
 
     toast.success(`Penalty recorded for ${memberName}`);
     fetchPenalties();
+    calculatePenaltiesFromRecords();
+  };
+
+  const recordAndMarkPaid = async (memberName: string, month: string, year: number, daysOverdue: number) => {
+    const { data: profileData } = await supabase
+      .from('profiles')
+      .select('user_id')
+      .eq('full_name', memberName)
+      .single();
+
+    if (!profileData) {
+      toast.error(`No profile found for ${memberName}`);
+      return;
+    }
+
+    const { data: existing } = await supabase
+      .from('penalties')
+      .select('id')
+      .eq('user_id', profileData.user_id)
+      .eq('month', month)
+      .eq('year', year)
+      .single();
+
+    if (existing) {
+      await supabase.from('penalties').update({
+        days_overdue: daysOverdue,
+        total_penalty: daysOverdue * 10,
+        paid: true,
+        paid_date: new Date().toISOString(),
+      }).eq('id', existing.id);
+    } else {
+      await supabase.from('penalties').insert({
+        user_id: profileData.user_id,
+        month,
+        year,
+        days_overdue: daysOverdue,
+        daily_penalty: 10,
+        total_penalty: daysOverdue * 10,
+        paid: true,
+        paid_date: new Date().toISOString(),
+      });
+    }
+
+    toast.success(`Penalty recorded & marked paid for ${memberName}`);
+    fetchPenalties();
+    calculatePenaltiesFromRecords();
   };
 
   // --- NOTIFICATIONS ---
@@ -478,13 +607,13 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6 flex-wrap">
-            <TabsTrigger value="payments" className="gap-2"><CreditCard className="w-4 h-4" />Payments</TabsTrigger>
-            <TabsTrigger value="overview" className="gap-2"><Eye className="w-4 h-4" />Overview</TabsTrigger>
-            <TabsTrigger value="members" className="gap-2"><Users className="w-4 h-4" />Members</TabsTrigger>
-            <TabsTrigger value="notifications" className="gap-2"><Bell className="w-4 h-4" />Notifications</TabsTrigger>
-            <TabsTrigger value="penalties" className="gap-2"><AlertTriangle className="w-4 h-4" />Penalties</TabsTrigger>
-            <TabsTrigger value="penalties_collected" className="gap-2"><DollarSign className="w-4 h-4" />Penalties Collected</TabsTrigger>
+          <TabsList className="mb-6 flex-wrap h-auto gap-1">
+            <TabsTrigger value="payments" className="gap-1 text-xs sm:text-sm"><CreditCard className="w-4 h-4" /><span className="hidden sm:inline">Payments</span><span className="sm:hidden">Pay</span></TabsTrigger>
+            <TabsTrigger value="overview" className="gap-1 text-xs sm:text-sm"><Eye className="w-4 h-4" /><span className="hidden sm:inline">Overview</span><span className="sm:hidden">View</span></TabsTrigger>
+            <TabsTrigger value="members" className="gap-1 text-xs sm:text-sm"><Users className="w-4 h-4" /><span className="hidden sm:inline">Members</span><span className="sm:hidden">Mem</span></TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-1 text-xs sm:text-sm"><Bell className="w-4 h-4" /><span className="hidden sm:inline">Notifications</span><span className="sm:hidden">Notif</span></TabsTrigger>
+            <TabsTrigger value="penalties" className="gap-1 text-xs sm:text-sm"><AlertTriangle className="w-4 h-4" /><span className="hidden sm:inline">Penalties</span><span className="sm:hidden">Pen</span></TabsTrigger>
+            <TabsTrigger value="penalties_collected" className="gap-1 text-xs sm:text-sm"><DollarSign className="w-4 h-4" /><span className="hidden sm:inline">Penalties Collected</span><span className="sm:hidden">Collected</span></TabsTrigger>
           </TabsList>
 
           {/* PAYMENTS TAB */}
@@ -745,19 +874,82 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          {/* PENALTIES TAB - with mark as paid */}
+          {/* PENALTIES TAB - auto-calculated from records */}
           <TabsContent value="penalties">
-            <PenaltiesTab 
-              selectedMonth={selectedMonth} 
-              selectedYear={selectedYear} 
-              allMembers={allMembers} 
-              paidMembers={paidMembers}
-              onCreatePenalty={createPenaltyRecord}
-              penaltyRecords={penaltyRecords}
-              onMarkPaid={markPenaltyPaid}
-              onMarkUnpaid={markPenaltyUnpaid}
-              savingPenalty={savingPenalty}
-            />
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-muted-foreground">Total Outstanding Penalties</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      KSh {calculatedPenalties.reduce((s, p) => s + p.penaltyAmount, 0).toLocaleString()}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-muted-foreground">Members with Penalties</p>
+                    <p className="text-2xl font-bold">{new Set(calculatedPenalties.map(p => p.memberName)).size}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5" />
+                    Active Penalties (Auto-calculated from Records)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {calculatedPenalties.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
+                      <p>No outstanding penalties!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {calculatedPenalties.map((penalty, idx) => {
+                        const existingId = penalty.existingRecord?.id;
+                        const isSaving = savingPenalty === existingId || savingPenalty === `new-${idx}`;
+                        
+                        return (
+                          <div key={`${penalty.memberName}-${penalty.month}-${penalty.year}`} className="p-3 rounded-lg border bg-red-50 border-red-100">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <span className="font-medium block truncate">{penalty.memberName}</span>
+                                <p className="text-sm text-muted-foreground">
+                                  {penalty.month} {penalty.year} — {penalty.daysLate} days late
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-semibold text-red-600 whitespace-nowrap">
+                                  KSh {penalty.penaltyAmount.toLocaleString()}
+                                </span>
+                                {penalty.existingRecord ? (
+                                  <Button variant="outline" size="sm" onClick={() => markPenaltyPaid(existingId!)} disabled={isSaving} className="text-green-600 border-green-300 hover:bg-green-100 whitespace-nowrap">
+                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-1" />Mark Paid</>}
+                                  </Button>
+                                ) : (
+                                  <div className="flex gap-1">
+                                    <Button variant="outline" size="sm" onClick={() => { setSavingPenalty(`new-${idx}`); createPenaltyRecord(penalty.memberName, penalty.month, penalty.year, penalty.daysLate); }} disabled={isSaving} className="text-orange-600 border-orange-300 hover:bg-orange-100 whitespace-nowrap text-xs">
+                                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Record'}
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={() => { setSavingPenalty(`new-${idx}`); recordAndMarkPaid(penalty.memberName, penalty.month, penalty.year, penalty.daysLate); }} disabled={isSaving} className="text-green-600 border-green-300 hover:bg-green-100 whitespace-nowrap text-xs">
+                                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-1" />Paid</>}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* PENALTIES COLLECTED TAB */}
@@ -766,7 +958,7 @@ export default function AdminDashboard() {
               <div className="flex justify-center py-12"><Loader2 className="w-8 h-8 animate-spin" /></div>
             ) : (
               <div className="space-y-4">
-                <div className="grid sm:grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                   <Card>
                     <CardContent className="pt-6">
                       <p className="text-sm text-muted-foreground">Total Penalties Collected</p>
@@ -802,23 +994,37 @@ export default function AdminDashboard() {
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        {penaltyRecords.map((penalty) => (
-                          <div key={penalty.id} className={`flex items-center justify-between p-3 rounded-lg border ${penalty.paid ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
-                            <div>
-                              <span className="font-medium">{penalty.member_name}</span>
-                              <p className="text-sm text-muted-foreground">{penalty.month} {penalty.year} — {penalty.days_overdue} days overdue</p>
-                              {penalty.paid && penalty.paid_date && (
-                                <p className="text-xs text-green-600">Paid on {new Date(penalty.paid_date).toLocaleDateString()}</p>
-                              )}
+                        {penaltyRecords.map((penalty) => {
+                          const isSaving = savingPenalty === penalty.id;
+                          return (
+                            <div key={penalty.id} className={`p-3 rounded-lg border ${penalty.paid ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div className="min-w-0">
+                                  <span className="font-medium block truncate">{penalty.member_name}</span>
+                                  <p className="text-sm text-muted-foreground">{penalty.month} {penalty.year} — {penalty.days_overdue} days overdue</p>
+                                  {penalty.paid && penalty.paid_date && (
+                                    <p className="text-xs text-green-600">Paid on {new Date(penalty.paid_date).toLocaleDateString()}</p>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span className="font-semibold whitespace-nowrap">KSh {Number(penalty.total_penalty).toLocaleString()}</span>
+                                  <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${penalty.paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                    {penalty.paid ? <><CheckCircle className="w-3 h-3" />Paid</> : <><AlertTriangle className="w-3 h-3" />Unpaid</>}
+                                  </span>
+                                  {penalty.paid ? (
+                                    <Button variant="outline" size="sm" onClick={() => markPenaltyUnpaid(penalty.id)} disabled={isSaving} className="text-red-600 border-red-300 hover:bg-red-100 whitespace-nowrap text-xs">
+                                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Undo'}
+                                    </Button>
+                                  ) : (
+                                    <Button variant="outline" size="sm" onClick={() => markPenaltyPaid(penalty.id)} disabled={isSaving} className="text-green-600 border-green-300 hover:bg-green-100 whitespace-nowrap text-xs">
+                                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-1" />Mark Paid</>}
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-3">
-                              <span className="font-semibold">KSh {Number(penalty.total_penalty).toLocaleString()}</span>
-                              <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${penalty.paid ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                                {penalty.paid ? <><CheckCircle className="w-3 h-3" />Paid</> : <><AlertTriangle className="w-3 h-3" />Unpaid</>}
-                              </span>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </CardContent>
@@ -833,104 +1039,3 @@ export default function AdminDashboard() {
   );
 }
 
-// Penalties sub-component
-function PenaltiesTab({ 
-  selectedMonth, selectedYear, allMembers, paidMembers, onCreatePenalty, penaltyRecords, onMarkPaid, onMarkUnpaid, savingPenalty 
-}: { 
-  selectedMonth: string; selectedYear: string; allMembers: string[]; paidMembers: string[];
-  onCreatePenalty: (name: string, month: string, year: number, days: number) => void;
-  penaltyRecords: PenaltyRecord[];
-  onMarkPaid: (id: string) => void;
-  onMarkUnpaid: (id: string) => void;
-  savingPenalty: string | null;
-}) {
-  const today = new Date();
-  
-  // Penalty logic: For selected month, deadline is 10th of NEXT month
-  const monthIndex = MONTHS.indexOf(selectedMonth);
-  let deadlineMonth = monthIndex + 1;
-  let deadlineYear = parseInt(selectedYear);
-  if (deadlineMonth > 11) {
-    deadlineMonth = 0;
-    deadlineYear++;
-  }
-  
-  const deadlineDate = new Date(deadlineYear, deadlineMonth, 10, 23, 59, 59);
-  const isOverDeadline = today > deadlineDate;
-  const daysLate = isOverDeadline ? Math.floor((today.getTime() - deadlineDate.getTime()) / (1000 * 60 * 60 * 24)) : 0;
-  const penaltyPerDay = 10;
-
-  const unpaidMembers = allMembers.filter(m => !paidMembers.includes(m));
-
-  // Get penalty records for this month
-  const monthPenalties = penaltyRecords.filter(p => p.month === selectedMonth && p.year === parseInt(selectedYear));
-
-  return (
-    <div>
-      {isOverDeadline && unpaidMembers.length > 0 && (
-        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="w-5 h-5 text-red-600" />
-            <h3 className="font-semibold text-red-800">Penalty Alert — {daysLate} days past deadline</h3>
-          </div>
-          <p className="text-sm text-red-700">
-            Deadline for {selectedMonth} {selectedYear} was {MONTHS[deadlineMonth]} 10, {deadlineYear}. 
-            {unpaidMembers.length} member(s) haven't paid. Penalty: KSh {penaltyPerDay}/day = KSh {(daysLate * penaltyPerDay).toLocaleString()} per member.
-          </p>
-        </div>
-      )}
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Unpaid Members — {selectedMonth} {selectedYear}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {unpaidMembers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
-              <p>All members have paid for this month!</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {unpaidMembers.map((name, idx) => {
-                const existingPenalty = monthPenalties.find(p => p.member_name === name);
-                const isSaving = savingPenalty === existingPenalty?.id;
-                
-                return (
-                  <div key={name} className="flex items-center justify-between p-3 rounded-lg border bg-red-50 border-red-100">
-                    <div>
-                      <span className="text-sm text-muted-foreground mr-2">{idx + 1}.</span>
-                      <span className="font-medium">{name}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {isOverDeadline && (
-                        <span className="text-sm font-medium text-red-600">
-                          Penalty: KSh {(daysLate * penaltyPerDay).toLocaleString()}
-                        </span>
-                      )}
-                      {existingPenalty ? (
-                        existingPenalty.paid ? (
-                          <Button variant="outline" size="sm" onClick={() => onMarkUnpaid(existingPenalty.id)} disabled={isSaving} className="bg-green-100 text-green-800 border-green-300">
-                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-1" />Paid</>}
-                          </Button>
-                        ) : (
-                          <Button variant="outline" size="sm" onClick={() => onMarkPaid(existingPenalty.id)} disabled={isSaving} className="text-red-600 border-red-300 hover:bg-red-100">
-                            {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Mark Paid'}
-                          </Button>
-                        )
-                      ) : isOverDeadline ? (
-                        <Button variant="outline" size="sm" onClick={() => onCreatePenalty(name, selectedMonth, parseInt(selectedYear), daysLate)} className="text-orange-600 border-orange-300 hover:bg-orange-100">
-                          Record Penalty
-                        </Button>
-                      ) : null}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  );
-}

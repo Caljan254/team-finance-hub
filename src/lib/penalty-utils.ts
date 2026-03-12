@@ -50,9 +50,9 @@ export function calculateOutstanding(
   const currentMonthIndex = now.getMonth();
   const currentDay = now.getDate();
 
-  // Start from March 2026
-  const startYear = 2026;
-  const startMonthIndex = 2; // March
+  // Start from January 2025 (group start)
+  const startYear = 2025;
+  const startMonthIndex = 0; // January
 
   const paidSet = new Set(
     paidMonths
