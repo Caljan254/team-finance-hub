@@ -874,19 +874,82 @@ export default function AdminDashboard() {
             </Card>
           </TabsContent>
 
-          {/* PENALTIES TAB - with mark as paid */}
+          {/* PENALTIES TAB - auto-calculated from records */}
           <TabsContent value="penalties">
-            <PenaltiesTab 
-              selectedMonth={selectedMonth} 
-              selectedYear={selectedYear} 
-              allMembers={allMembers} 
-              paidMembers={paidMembers}
-              onCreatePenalty={createPenaltyRecord}
-              penaltyRecords={penaltyRecords}
-              onMarkPaid={markPenaltyPaid}
-              onMarkUnpaid={markPenaltyUnpaid}
-              savingPenalty={savingPenalty}
-            />
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-muted-foreground">Total Outstanding Penalties</p>
+                    <p className="text-2xl font-bold text-red-600">
+                      KSh {calculatedPenalties.reduce((s, p) => s + p.penaltyAmount, 0).toLocaleString()}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-muted-foreground">Members with Penalties</p>
+                    <p className="text-2xl font-bold">{new Set(calculatedPenalties.map(p => p.memberName)).size}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <AlertTriangle className="w-5 h-5" />
+                    Active Penalties (Auto-calculated from Records)
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {calculatedPenalties.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <CheckCircle className="w-12 h-12 mx-auto mb-2 text-green-500" />
+                      <p>No outstanding penalties!</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {calculatedPenalties.map((penalty, idx) => {
+                        const existingId = penalty.existingRecord?.id;
+                        const isSaving = savingPenalty === existingId || savingPenalty === `new-${idx}`;
+                        
+                        return (
+                          <div key={`${penalty.memberName}-${penalty.month}-${penalty.year}`} className="p-3 rounded-lg border bg-red-50 border-red-100">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <span className="font-medium block truncate">{penalty.memberName}</span>
+                                <p className="text-sm text-muted-foreground">
+                                  {penalty.month} {penalty.year} — {penalty.daysLate} days late
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-semibold text-red-600 whitespace-nowrap">
+                                  KSh {penalty.penaltyAmount.toLocaleString()}
+                                </span>
+                                {penalty.existingRecord ? (
+                                  <Button variant="outline" size="sm" onClick={() => markPenaltyPaid(existingId!)} disabled={isSaving} className="text-green-600 border-green-300 hover:bg-green-100 whitespace-nowrap">
+                                    {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-1" />Mark Paid</>}
+                                  </Button>
+                                ) : (
+                                  <div className="flex gap-1">
+                                    <Button variant="outline" size="sm" onClick={() => { setSavingPenalty(`new-${idx}`); createPenaltyRecord(penalty.memberName, penalty.month, penalty.year, penalty.daysLate); }} disabled={isSaving} className="text-orange-600 border-orange-300 hover:bg-orange-100 whitespace-nowrap text-xs">
+                                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Record'}
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={() => { setSavingPenalty(`new-${idx}`); recordAndMarkPaid(penalty.memberName, penalty.month, penalty.year, penalty.daysLate); }} disabled={isSaving} className="text-green-600 border-green-300 hover:bg-green-100 whitespace-nowrap text-xs">
+                                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle className="w-4 h-4 mr-1" />Paid</>}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* PENALTIES COLLECTED TAB */}
