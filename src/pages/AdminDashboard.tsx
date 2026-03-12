@@ -607,11 +607,13 @@ export default function AdminDashboard() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6 flex-wrap">
-            <TabsTrigger value="payments" className="gap-2"><CreditCard className="w-4 h-4" />Payments</TabsTrigger>
-            <TabsTrigger value="overview" className="gap-2"><Eye className="w-4 h-4" />Overview</TabsTrigger>
-            <TabsTrigger value="members" className="gap-2"><Users className="w-4 h-4" />Members</TabsTrigger>
-            <TabsTrigger value="notifications" className="gap-2"><Bell className="w-4 h-4" />Notifications</TabsTrigger>
+          <TabsList className="mb-6 flex-wrap h-auto gap-1">
+            <TabsTrigger value="payments" className="gap-1 text-xs sm:text-sm"><CreditCard className="w-4 h-4" /><span className="hidden sm:inline">Payments</span><span className="sm:hidden">Pay</span></TabsTrigger>
+            <TabsTrigger value="overview" className="gap-1 text-xs sm:text-sm"><Eye className="w-4 h-4" /><span className="hidden sm:inline">Overview</span><span className="sm:hidden">View</span></TabsTrigger>
+            <TabsTrigger value="members" className="gap-1 text-xs sm:text-sm"><Users className="w-4 h-4" /><span className="hidden sm:inline">Members</span><span className="sm:hidden">Mem</span></TabsTrigger>
+            <TabsTrigger value="notifications" className="gap-1 text-xs sm:text-sm"><Bell className="w-4 h-4" /><span className="hidden sm:inline">Notifications</span><span className="sm:hidden">Notif</span></TabsTrigger>
+            <TabsTrigger value="penalties" className="gap-1 text-xs sm:text-sm"><AlertTriangle className="w-4 h-4" /><span className="hidden sm:inline">Penalties</span><span className="sm:hidden">Pen</span></TabsTrigger>
+            <TabsTrigger value="penalties_collected" className="gap-1 text-xs sm:text-sm"><DollarSign className="w-4 h-4" /><span className="hidden sm:inline">Penalties Collected</span><span className="sm:hidden">Collected</span></TabsTrigger>
             <TabsTrigger value="penalties" className="gap-2"><AlertTriangle className="w-4 h-4" />Penalties</TabsTrigger>
             <TabsTrigger value="penalties_collected" className="gap-2"><DollarSign className="w-4 h-4" />Penalties Collected</TabsTrigger>
           </TabsList>
